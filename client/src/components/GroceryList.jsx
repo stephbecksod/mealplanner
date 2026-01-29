@@ -8,8 +8,11 @@ const GroceryList = () => {
   const [includeBeverages, setIncludeBeverages] = useState(false)
   const [checkedWines, setCheckedWines] = useState({})
 
-  // Check if any meals have beverage pairings
-  const hasCocktails = mealPlan?.dinners?.some(d => d.beveragePairing?.cocktail) || false
+  // Check if any meals have beverage pairings (support both old and new format)
+  const hasCocktails = mealPlan?.dinners?.some(d => {
+    const cocktails = d.beveragePairing?.cocktails || (d.beveragePairing?.cocktail ? [d.beveragePairing.cocktail] : [])
+    return cocktails.length > 0
+  }) || false
   const hasWines = mealPlan?.dinners?.some(d => d.beveragePairing?.wine) || false
   const hasBeverages = hasCocktails || hasWines
 
