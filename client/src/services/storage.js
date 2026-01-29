@@ -136,24 +136,54 @@ class StorageService {
     return this.setItem(STORAGE_KEYS.GROCERY_LIST, groceryList)
   }
 
-  // Migration function to convert old meal plan format (recipe) to new format (mainDish)
+  // Migration function to convert old meal plan format to new format
   migrateMealPlan(mealPlan) {
     if (!mealPlan || !mealPlan.dinners) return mealPlan
 
-    const needsMigration = mealPlan.dinners.some(dinner => dinner.recipe && !dinner.mainDish)
+    const needsMigration = mealPlan.dinners.some(dinner =>
+      (dinner.recipe && !dinner.mainDish) ||
+      (dinner.sideDish && !dinner.sideDishes) ||
+      (dinner.beveragePairing?.cocktail && !dinner.beveragePairing?.cocktails)
+    )
 
     if (!needsMigration) return mealPlan
 
     const migratedDinners = mealPlan.dinners.map(dinner => {
+      let migrated = { ...dinner }
+
+      // Migrate recipe -> mainDish
       if (dinner.recipe && !dinner.mainDish) {
-        const { recipe, ...rest } = dinner
-        return {
-          ...rest,
-          mainDish: recipe,
-          sideDish: null,
+        const { recipe, ...rest } = migrated
+        migrated = { ...rest, mainDish: recipe }
+      }
+
+      // Migrate sideDish -> sideDishes (array)
+      if (dinner.sideDish && !dinner.sideDishes) {
+        migrated.sideDishes = [dinner.sideDish]
+      } else if (!dinner.sideDishes) {
+        migrated.sideDishes = []
+      }
+
+      // Migrate beveragePairing.cocktail -> beveragePairing.cocktails (array)
+      if (dinner.beveragePairing?.cocktail && !dinner.beveragePairing?.cocktails) {
+        migrated.beveragePairing = {
+          ...dinner.beveragePairing,
+          cocktails: [dinner.beveragePairing.cocktail],
+          cocktail: null,
+        }
+      } else if (dinner.beveragePairing && !dinner.beveragePairing.cocktails) {
+        migrated.beveragePairing = {
+          ...dinner.beveragePairing,
+          cocktails: [],
         }
       }
-      return dinner
+
+      // Ensure isAlaCarte flag exists
+      if (migrated.isAlaCarte === undefined) {
+        migrated.isAlaCarte = false
+      }
+
+      return migrated
     })
 
     return {

@@ -37,14 +37,23 @@ const combineIngredients = (meals, includeCocktails = false) => {
       mainDish.ingredients.forEach(ing => addIngredient(ing, meal.id, 'main'))
     }
 
-    // Add side dish ingredients
-    if (meal.sideDish && meal.sideDish.ingredients) {
-      meal.sideDish.ingredients.forEach(ing => addIngredient(ing, meal.id, 'side'))
-    }
+    // Add side dish ingredients - support both old (sideDish) and new (sideDishes) formats
+    const sideDishes = meal.sideDishes || (meal.sideDish ? [meal.sideDish] : [])
+    sideDishes.forEach(sideDish => {
+      if (sideDish && sideDish.ingredients) {
+        sideDish.ingredients.forEach(ing => addIngredient(ing, meal.id, 'side'))
+      }
+    })
 
-    // Add cocktail ingredients if requested
-    if (includeCocktails && meal.beveragePairing && meal.beveragePairing.cocktail && meal.beveragePairing.cocktail.ingredients) {
-      meal.beveragePairing.cocktail.ingredients.forEach(ing => addIngredient(ing, meal.id, 'cocktail'))
+    // Add cocktail ingredients if requested - support both old (cocktail) and new (cocktails) formats
+    if (includeCocktails && meal.beveragePairing) {
+      const cocktails = meal.beveragePairing.cocktails ||
+        (meal.beveragePairing.cocktail ? [meal.beveragePairing.cocktail] : [])
+      cocktails.forEach(cocktail => {
+        if (cocktail && cocktail.ingredients) {
+          cocktail.ingredients.forEach(ing => addIngredient(ing, meal.id, 'cocktail'))
+        }
+      })
     }
   })
 

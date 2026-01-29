@@ -53,9 +53,10 @@ export const MealPlanProvider = ({ children }) => {
           id: `meal-${Date.now()}-${index}`,
           dayOfWeek: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'][index] || `Day ${index + 1}`,
           mainDish,
-          sideDish: sideDish || null,
+          sideDishes: sideDish ? [sideDish] : [],
           servings: servings || 4,
           beveragePairing: null,
+          isAlaCarte: false,
         }
       })
 
@@ -115,12 +116,13 @@ export const MealPlanProvider = ({ children }) => {
 
     try {
       const meal = mealPlan.dinners.find(d => d.id === mealId)
+      const hasSides = meal?.sideDishes?.length > 0 || meal?.sideDish
       const newRecipe = await mealsAPI.regenerateMeal({
         mealId,
         dietaryPreferences,
         cuisinePreferences,
         servings,
-        includeSides: includeSides || !!meal?.sideDish, // Keep side if it existed
+        includeSides: includeSides || hasSides,
       })
 
       // Extract sideDish from recipe if it was included
@@ -128,7 +130,7 @@ export const MealPlanProvider = ({ children }) => {
 
       const updatedDinners = mealPlan.dinners.map(dinner =>
         dinner.id === mealId
-          ? { ...dinner, mainDish, sideDish: sideDish || null, beveragePairing: null }
+          ? { ...dinner, mainDish, sideDishes: sideDish ? [sideDish] : [], beveragePairing: null }
           : dinner
       )
 
@@ -150,16 +152,22 @@ export const MealPlanProvider = ({ children }) => {
   }
 
   const addMeal = async (recipe, servings) => {
+    // Count non-a-la-carte meals for day numbering
+    const regularMeals = (mealPlan?.dinners || []).filter(d => !d.isAlaCarte)
+    const alaCarte = (mealPlan?.dinners || []).filter(d => d.isAlaCarte)
+
     const newDinner = {
       id: `meal-${Date.now()}`,
-      dayOfWeek: `Day ${mealPlan.dinners.length + 1}`,
+      dayOfWeek: `Day ${regularMeals.length + 1}`,
       mainDish: recipe,
-      sideDish: null,
+      sideDishes: [],
       servings: servings || 4,
       beveragePairing: null,
+      isAlaCarte: false,
     }
 
-    const updatedDinners = [...mealPlan.dinners, newDinner]
+    // Keep a la carte items at the end
+    const updatedDinners = [...regularMeals, newDinner, ...alaCarte]
     const updatedMealPlan = { ...mealPlan, dinners: updatedDinners }
 
     setMealPlan(updatedMealPlan)
@@ -168,6 +176,56 @@ export const MealPlanProvider = ({ children }) => {
     const newGroceryList = await groceryAPI.generateList({ meals: updatedDinners })
     setGroceryList(newGroceryList)
     storage.setGroceryList(newGroceryList)
+  }
+
+  const generateNewMeal = async (servings = 4) => {
+    setLoading(true)
+    setError(null)
+
+    try {
+      const meals = await mealsAPI.generateMeals({
+        numberOfMeals: 1,
+        dietaryPreferences: mealPlan?.dietaryPreferences || [],
+        cuisinePreferences: mealPlan?.cuisinePreferences || [],
+        servings,
+        includeSides: false,
+      })
+
+      const meal = meals[0]
+      const { sideDish, ...mainDish } = meal
+
+      // Count non-a-la-carte meals for day numbering
+      const regularMeals = (mealPlan?.dinners || []).filter(d => !d.isAlaCarte)
+      const alaCarte = (mealPlan?.dinners || []).filter(d => d.isAlaCarte)
+
+      const newDinner = {
+        id: `meal-${Date.now()}`,
+        dayOfWeek: `Day ${regularMeals.length + 1}`,
+        mainDish,
+        sideDishes: sideDish ? [sideDish] : [],
+        servings,
+        beveragePairing: null,
+        isAlaCarte: false,
+      }
+
+      // Keep a la carte items at the end
+      const updatedDinners = [...regularMeals, newDinner, ...alaCarte]
+      const updatedMealPlan = { ...mealPlan, dinners: updatedDinners }
+
+      setMealPlan(updatedMealPlan)
+      storage.setCurrentMealPlan(updatedMealPlan)
+
+      const newGroceryList = await groceryAPI.generateList({ meals: updatedDinners })
+      setGroceryList(newGroceryList)
+      storage.setGroceryList(newGroceryList)
+
+      return newDinner
+    } catch (err) {
+      setError(err.message || 'Failed to generate new meal')
+      throw err
+    } finally {
+      setLoading(false)
+    }
   }
 
   // Side dish methods
@@ -185,8 +243,9 @@ export const MealPlanProvider = ({ children }) => {
         servings: dinner.servings,
       })
 
+      const currentSides = dinner.sideDishes || (dinner.sideDish ? [dinner.sideDish] : [])
       const updatedDinners = mealPlan.dinners.map(d =>
-        d.id === mealId ? { ...d, sideDish } : d
+        d.id === mealId ? { ...d, sideDishes: [...currentSides, sideDish] } : d
       )
 
       const updatedMealPlan = { ...mealPlan, dinners: updatedDinners }
@@ -206,9 +265,94 @@ export const MealPlanProvider = ({ children }) => {
     }
   }
 
-  const removeSideDish = async (mealId) => {
+  // Add a saved side dish to a specific meal
+  const addSideDishToMeal = async (mealId, sideDish) => {
+    const dinner = mealPlan.dinners.find(d => d.id === mealId)
+    if (!dinner) throw new Error('Meal not found')
+
+    const currentSides = dinner.sideDishes || (dinner.sideDish ? [dinner.sideDish] : [])
     const updatedDinners = mealPlan.dinners.map(d =>
-      d.id === mealId ? { ...d, sideDish: null } : d
+      d.id === mealId ? { ...d, sideDishes: [...currentSides, { ...sideDish, id: `${sideDish.id}-${Date.now()}` }] } : d
+    )
+
+    const updatedMealPlan = { ...mealPlan, dinners: updatedDinners }
+    setMealPlan(updatedMealPlan)
+    storage.setCurrentMealPlan(updatedMealPlan)
+
+    const newGroceryList = await groceryAPI.generateList({ meals: updatedDinners })
+    setGroceryList(newGroceryList)
+    storage.setGroceryList(newGroceryList)
+  }
+
+  // Add a la carte side dish
+  const addAlaCarteSideDish = async (sideDish) => {
+    const regularMeals = (mealPlan?.dinners || []).filter(d => !d.isAlaCarte)
+    const alaCarte = (mealPlan?.dinners || []).filter(d => d.isAlaCarte)
+
+    const newAlaCarte = {
+      id: `alacarte-${Date.now()}`,
+      mainDish: null,
+      sideDishes: [{ ...sideDish, id: `${sideDish.id}-${Date.now()}` }],
+      servings: 4,
+      beveragePairing: null,
+      isAlaCarte: true,
+    }
+
+    const updatedDinners = [...regularMeals, ...alaCarte, newAlaCarte]
+    const updatedMealPlan = { ...mealPlan, dinners: updatedDinners }
+
+    setMealPlan(updatedMealPlan)
+    storage.setCurrentMealPlan(updatedMealPlan)
+
+    const newGroceryList = await groceryAPI.generateList({ meals: updatedDinners })
+    setGroceryList(newGroceryList)
+    storage.setGroceryList(newGroceryList)
+  }
+
+  // Add a la carte cocktail
+  const addAlaCarteCocktail = async (cocktail) => {
+    const regularMeals = (mealPlan?.dinners || []).filter(d => !d.isAlaCarte)
+    const alaCarte = (mealPlan?.dinners || []).filter(d => d.isAlaCarte)
+
+    const newAlaCarte = {
+      id: `alacarte-${Date.now()}`,
+      mainDish: null,
+      sideDishes: [],
+      servings: 4,
+      beveragePairing: {
+        cocktails: [{ ...cocktail, id: `${cocktail.id}-${Date.now()}` }],
+        wine: null,
+      },
+      isAlaCarte: true,
+    }
+
+    const updatedDinners = [...regularMeals, ...alaCarte, newAlaCarte]
+    const updatedMealPlan = { ...mealPlan, dinners: updatedDinners }
+
+    setMealPlan(updatedMealPlan)
+    storage.setCurrentMealPlan(updatedMealPlan)
+
+    const newGroceryList = await groceryAPI.generateList({ meals: updatedDinners })
+    setGroceryList(newGroceryList)
+    storage.setGroceryList(newGroceryList)
+  }
+
+  const removeSideDish = async (mealId, sideDishId = null) => {
+    const dinner = mealPlan.dinners.find(d => d.id === mealId)
+    if (!dinner) return
+
+    let updatedSideDishes
+    if (sideDishId) {
+      // Remove specific side dish
+      const currentSides = dinner.sideDishes || (dinner.sideDish ? [dinner.sideDish] : [])
+      updatedSideDishes = currentSides.filter(s => s.id !== sideDishId)
+    } else {
+      // Remove all side dishes (legacy behavior)
+      updatedSideDishes = []
+    }
+
+    const updatedDinners = mealPlan.dinners.map(d =>
+      d.id === mealId ? { ...d, sideDishes: updatedSideDishes } : d
     )
 
     const updatedMealPlan = { ...mealPlan, dinners: updatedDinners }
@@ -234,8 +378,9 @@ export const MealPlanProvider = ({ children }) => {
         servings: dinner.servings,
       })
 
+      // Replace all sides with new one
       const updatedDinners = mealPlan.dinners.map(d =>
-        d.id === mealId ? { ...d, sideDish } : d
+        d.id === mealId ? { ...d, sideDishes: [sideDish] } : d
       )
 
       const updatedMealPlan = { ...mealPlan, dinners: updatedDinners }
@@ -299,9 +444,13 @@ export const MealPlanProvider = ({ children }) => {
         ingredients: dinner.mainDish.ingredients.map(i => i.item),
       })
 
+      const currentCocktails = dinner.beveragePairing?.cocktails ||
+        (dinner.beveragePairing?.cocktail ? [dinner.beveragePairing.cocktail] : [])
+
       const updatedBeveragePairing = {
         ...dinner.beveragePairing,
-        cocktail: result.cocktail,
+        cocktails: [...currentCocktails, result.cocktail],
+        cocktail: null, // Clear legacy field
       }
 
       const updatedDinners = mealPlan.dinners.map(d =>
@@ -319,6 +468,33 @@ export const MealPlanProvider = ({ children }) => {
     } finally {
       setLoading(false)
     }
+  }
+
+  // Add a saved cocktail to a specific meal
+  const addCocktailToMeal = async (mealId, cocktail) => {
+    const dinner = mealPlan.dinners.find(d => d.id === mealId)
+    if (!dinner) throw new Error('Meal not found')
+
+    const currentCocktails = dinner.beveragePairing?.cocktails ||
+      (dinner.beveragePairing?.cocktail ? [dinner.beveragePairing.cocktail] : [])
+
+    const updatedBeveragePairing = {
+      ...dinner.beveragePairing,
+      cocktails: [...currentCocktails, { ...cocktail, id: `${cocktail.id}-${Date.now()}` }],
+      cocktail: null,
+    }
+
+    const updatedDinners = mealPlan.dinners.map(d =>
+      d.id === mealId ? { ...d, beveragePairing: updatedBeveragePairing } : d
+    )
+
+    const updatedMealPlan = { ...mealPlan, dinners: updatedDinners }
+    setMealPlan(updatedMealPlan)
+    storage.setCurrentMealPlan(updatedMealPlan)
+
+    const newGroceryList = await groceryAPI.generateList({ meals: updatedDinners })
+    setGroceryList(newGroceryList)
+    storage.setGroceryList(newGroceryList)
   }
 
   const addWinePairing = async (mealId) => {
@@ -366,16 +542,30 @@ export const MealPlanProvider = ({ children }) => {
     storage.setCurrentMealPlan(updatedMealPlan)
   }
 
-  const removeCocktail = (mealId) => {
+  const removeCocktail = async (mealId, cocktailId = null) => {
     const dinner = mealPlan.dinners.find(d => d.id === mealId)
     if (!dinner) return
 
+    let updatedCocktails
+    const currentCocktails = dinner.beveragePairing?.cocktails ||
+      (dinner.beveragePairing?.cocktail ? [dinner.beveragePairing.cocktail] : [])
+
+    if (cocktailId) {
+      // Remove specific cocktail
+      updatedCocktails = currentCocktails.filter(c => c.id !== cocktailId)
+    } else {
+      // Remove all cocktails (legacy behavior)
+      updatedCocktails = []
+    }
+
     const updatedBeveragePairing = dinner.beveragePairing
-      ? { ...dinner.beveragePairing, cocktail: null }
+      ? { ...dinner.beveragePairing, cocktails: updatedCocktails, cocktail: null }
       : null
 
-    // If both are null, remove the entire beveragePairing
-    const finalBeveragePairing = updatedBeveragePairing?.wine ? updatedBeveragePairing : null
+    // If no cocktails and no wine, remove the entire beveragePairing
+    const hasCocktails = updatedCocktails.length > 0
+    const hasWine = updatedBeveragePairing?.wine
+    const finalBeveragePairing = (hasCocktails || hasWine) ? updatedBeveragePairing : null
 
     const updatedDinners = mealPlan.dinners.map(d =>
       d.id === mealId ? { ...d, beveragePairing: finalBeveragePairing } : d
@@ -384,6 +574,10 @@ export const MealPlanProvider = ({ children }) => {
     const updatedMealPlan = { ...mealPlan, dinners: updatedDinners }
     setMealPlan(updatedMealPlan)
     storage.setCurrentMealPlan(updatedMealPlan)
+
+    const newGroceryList = await groceryAPI.generateList({ meals: updatedDinners })
+    setGroceryList(newGroceryList)
+    storage.setGroceryList(newGroceryList)
   }
 
   const removeWinePairing = (mealId) => {
@@ -508,7 +702,7 @@ export const MealPlanProvider = ({ children }) => {
 
       const updatedDinners = mealPlan.dinners.map(d =>
         d.id === mealId
-          ? { ...d, mainDish, sideDish: sideDish || null, beveragePairing }
+          ? { ...d, mainDish, sideDishes: sideDish ? [sideDish] : [], beveragePairing }
           : d
       )
 
@@ -610,17 +804,22 @@ export const MealPlanProvider = ({ children }) => {
     generateMealPlan,
     regenerateMeal,
     addMeal,
+    generateNewMeal,
     removeMeal,
     clearMealPlan,
     updateGroceryItem,
     addManualGroceryItem,
     // Side dish methods
     addSideDish,
+    addSideDishToMeal,
+    addAlaCarteSideDish,
     removeSideDish,
     regenerateSideDish,
     // Beverage methods
     addBeveragePairing,
     addCocktail,
+    addCocktailToMeal,
+    addAlaCarteCocktail,
     addWinePairing,
     removeBeveragePairing,
     removeCocktail,
