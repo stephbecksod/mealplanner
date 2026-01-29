@@ -18,21 +18,41 @@ api.interceptors.response.use(
 )
 
 export const mealsAPI = {
-  generateMeals: async ({ numberOfMeals, dietaryPreferences, cuisinePreferences, servings }) => {
+  generateMeals: async ({ numberOfMeals, dietaryPreferences, cuisinePreferences, servings, includeSides }) => {
     const response = await api.post('/meals/generate', {
       numberOfMeals,
       dietaryPreferences,
       cuisinePreferences,
       servings,
+      includeSides,
     })
     return response.data
   },
 
-  regenerateMeal: async ({ mealId, dietaryPreferences, cuisinePreferences, servings }) => {
+  regenerateMeal: async ({ mealId, dietaryPreferences, cuisinePreferences, servings, includeSides }) => {
     const response = await api.post('/meals/regenerate', {
       mealId,
       dietaryPreferences,
       cuisinePreferences,
+      servings,
+      includeSides,
+    })
+    return response.data
+  },
+
+  addSideDish: async ({ mainDish, dietaryPreferences, servings }) => {
+    const response = await api.post('/meals/add-side', {
+      mainDish,
+      dietaryPreferences,
+      servings,
+    })
+    return response.data
+  },
+
+  regenerateSideDish: async ({ mainDish, dietaryPreferences, servings }) => {
+    const response = await api.post('/meals/regenerate-side', {
+      mainDish,
+      dietaryPreferences,
       servings,
     })
     return response.data
@@ -47,12 +67,29 @@ export const beveragesAPI = {
     })
     return response.data
   },
+
+  regenerateCocktail: async ({ recipeName, ingredients }) => {
+    const response = await api.post('/beverages/regenerate-cocktail', {
+      recipeName,
+      ingredients,
+    })
+    return response.data
+  },
+
+  regenerateWine: async ({ recipeName, ingredients }) => {
+    const response = await api.post('/beverages/regenerate-wine', {
+      recipeName,
+      ingredients,
+    })
+    return response.data
+  },
 }
 
 export const groceryAPI = {
-  generateList: async ({ meals }) => {
+  generateList: async ({ meals, includeCocktails = false }) => {
     const response = await api.post('/grocery/generate', {
       meals,
+      includeCocktails,
     })
     return response.data
   },

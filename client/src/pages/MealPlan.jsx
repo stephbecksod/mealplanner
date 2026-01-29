@@ -53,6 +53,8 @@ const MealPlan = () => {
         const meal = mealPlan.dinners.find(d => d.id === confirmMealId)
         await regenerateMeal(confirmMealId, {
           servings: meal.servings,
+          dietaryPreferences: mealPlan.dietaryPreferences || [],
+          cuisinePreferences: mealPlan.cuisinePreferences || [],
         })
       } else if (confirmType === 'remove') {
         await removeMeal(confirmMealId)

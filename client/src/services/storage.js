@@ -2,6 +2,7 @@ const STORAGE_KEYS = {
   CURRENT_MEAL_PLAN: 'meal-planner:currentMealPlan',
   SAVED_RECIPES: 'meal-planner:savedRecipes',
   SAVED_COCKTAILS: 'meal-planner:savedCocktails',
+  SAVED_SIDE_DISHES: 'meal-planner:savedSideDishes',
   USER_PREFERENCES: 'meal-planner:userPreferences',
   GROCERY_LIST: 'meal-planner:groceryList',
 }
@@ -89,6 +90,32 @@ class StorageService {
     return this.setSavedCocktails(updatedCocktails)
   }
 
+  removeSavedCocktail(cocktailId) {
+    const cocktails = this.getSavedCocktails()
+    const updatedCocktails = cocktails.filter(c => c.id !== cocktailId)
+    return this.setSavedCocktails(updatedCocktails)
+  }
+
+  getSavedSideDishes() {
+    return this.getItem(STORAGE_KEYS.SAVED_SIDE_DISHES) || []
+  }
+
+  setSavedSideDishes(sideDishes) {
+    return this.setItem(STORAGE_KEYS.SAVED_SIDE_DISHES, sideDishes)
+  }
+
+  addSavedSideDish(sideDish) {
+    const sideDishes = this.getSavedSideDishes()
+    const updatedSideDishes = [...sideDishes, { ...sideDish, savedAt: Date.now() }]
+    return this.setSavedSideDishes(updatedSideDishes)
+  }
+
+  removeSavedSideDish(sideDishId) {
+    const sideDishes = this.getSavedSideDishes()
+    const updatedSideDishes = sideDishes.filter(s => s.id !== sideDishId)
+    return this.setSavedSideDishes(updatedSideDishes)
+  }
+
   getUserPreferences() {
     return this.getItem(STORAGE_KEYS.USER_PREFERENCES) || {
       defaultServings: 4,
@@ -107,6 +134,32 @@ class StorageService {
 
   setGroceryList(groceryList) {
     return this.setItem(STORAGE_KEYS.GROCERY_LIST, groceryList)
+  }
+
+  // Migration function to convert old meal plan format (recipe) to new format (mainDish)
+  migrateMealPlan(mealPlan) {
+    if (!mealPlan || !mealPlan.dinners) return mealPlan
+
+    const needsMigration = mealPlan.dinners.some(dinner => dinner.recipe && !dinner.mainDish)
+
+    if (!needsMigration) return mealPlan
+
+    const migratedDinners = mealPlan.dinners.map(dinner => {
+      if (dinner.recipe && !dinner.mainDish) {
+        const { recipe, ...rest } = dinner
+        return {
+          ...rest,
+          mainDish: recipe,
+          sideDish: null,
+        }
+      }
+      return dinner
+    })
+
+    return {
+      ...mealPlan,
+      dinners: migratedDinners,
+    }
   }
 }
 

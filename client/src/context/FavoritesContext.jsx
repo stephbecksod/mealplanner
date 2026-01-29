@@ -14,13 +14,16 @@ export const useFavorites = () => {
 export const FavoritesProvider = ({ children }) => {
   const [savedRecipes, setSavedRecipes] = useState([])
   const [savedCocktails, setSavedCocktails] = useState([])
+  const [savedSideDishes, setSavedSideDishes] = useState([])
 
   useEffect(() => {
     const recipes = storage.getSavedRecipes()
     const cocktails = storage.getSavedCocktails()
+    const sideDishes = storage.getSavedSideDishes()
 
     setSavedRecipes(recipes)
     setSavedCocktails(cocktails)
+    setSavedSideDishes(sideDishes)
   }, [])
 
   const saveRecipe = (recipe) => {
@@ -76,15 +79,45 @@ export const FavoritesProvider = ({ children }) => {
     return savedCocktails.some(c => c.id === cocktailId)
   }
 
+  const saveSideDish = (sideDish) => {
+    const sideDishWithId = {
+      ...sideDish,
+      id: sideDish.id || `side-${Date.now()}`,
+    }
+
+    const isAlreadySaved = savedSideDishes.some(s => s.id === sideDishWithId.id || s.name === sideDishWithId.name)
+
+    if (isAlreadySaved) {
+      return false
+    }
+
+    storage.addSavedSideDish(sideDishWithId)
+    setSavedSideDishes(storage.getSavedSideDishes())
+    return true
+  }
+
+  const removeSideDish = (sideDishId) => {
+    storage.removeSavedSideDish(sideDishId)
+    setSavedSideDishes(storage.getSavedSideDishes())
+  }
+
+  const isSideDishSaved = (sideDishId) => {
+    return savedSideDishes.some(s => s.id === sideDishId)
+  }
+
   const value = {
     savedRecipes,
     savedCocktails,
+    savedSideDishes,
     saveRecipe,
     removeRecipe,
     saveCocktail,
     removeCocktail,
+    saveSideDish,
+    removeSideDish,
     isRecipeSaved,
     isCocktailSaved,
+    isSideDishSaved,
   }
 
   return <FavoritesContext.Provider value={value}>{children}</FavoritesContext.Provider>

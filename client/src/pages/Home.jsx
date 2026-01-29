@@ -33,6 +33,9 @@ const Home = () => {
   const [servings, setServings] = useState(4)
   const [selectedDietary, setSelectedDietary] = useState([])
   const [selectedCuisines, setSelectedCuisines] = useState([])
+  const [includeSides, setIncludeSides] = useState(false)
+  const [includeCocktails, setIncludeCocktails] = useState(false)
+  const [includeWine, setIncludeWine] = useState(false)
 
   const toggleDietary = (option) => {
     setSelectedDietary(prev =>
@@ -57,6 +60,9 @@ const Home = () => {
         dietaryPreferences: selectedDietary,
         cuisinePreferences: selectedCuisines,
         servings,
+        includeSides,
+        includeCocktails,
+        includeWine,
       })
       navigate('/meal-plan')
     } catch (err) {
@@ -150,6 +156,77 @@ const Home = () => {
                 {option}
               </button>
             ))}
+          </div>
+        </div>
+
+        <div className="space-y-3">
+          <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+            <div>
+              <label className="text-sm font-semibold text-gray-700">
+                Include Side Dishes
+              </label>
+              <p className="text-xs text-gray-500 mt-1">
+                Generate complementary side dishes with each meal
+              </p>
+            </div>
+            <button
+              onClick={() => setIncludeSides(!includeSides)}
+              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                includeSides ? 'bg-primary-600' : 'bg-gray-300'
+              }`}
+            >
+              <span
+                className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                  includeSides ? 'translate-x-6' : 'translate-x-1'
+                }`}
+              />
+            </button>
+          </div>
+
+          <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+            <div>
+              <label className="text-sm font-semibold text-gray-700">
+                Include Cocktails
+              </label>
+              <p className="text-xs text-gray-500 mt-1">
+                Generate a cocktail pairing for each meal
+              </p>
+            </div>
+            <button
+              onClick={() => setIncludeCocktails(!includeCocktails)}
+              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                includeCocktails ? 'bg-primary-600' : 'bg-gray-300'
+              }`}
+            >
+              <span
+                className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                  includeCocktails ? 'translate-x-6' : 'translate-x-1'
+                }`}
+              />
+            </button>
+          </div>
+
+          <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+            <div>
+              <label className="text-sm font-semibold text-gray-700">
+                Include Wine Pairing
+              </label>
+              <p className="text-xs text-gray-500 mt-1">
+                Generate a wine pairing suggestion for each meal
+              </p>
+            </div>
+            <button
+              onClick={() => setIncludeWine(!includeWine)}
+              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                includeWine ? 'bg-primary-600' : 'bg-gray-300'
+              }`}
+            >
+              <span
+                className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                  includeWine ? 'translate-x-6' : 'translate-x-1'
+                }`}
+              />
+            </button>
           </div>
         </div>
 
