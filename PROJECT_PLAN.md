@@ -365,6 +365,15 @@ meal-planner/
    - Automatic migration from old format (cocktail → cocktails array)
    - Backward compatible with existing saved data
 
+6. **Bug Fixes**:
+   - Fixed beverage toggle in grocery list (now supports both old and new data formats)
+
+### Remaining Phase 5 Tasks:
+- [ ] Ingredient overlap optimization across the week
+- [ ] Error handling and offline support
+- [ ] Prepare architecture for future multi-user support
+- [ ] Add confirmation dialogs for destructive actions
+
 ### Previous Session:
 - Side Dish Feature with AI generation
 - Beverage Pairing (separate cocktail/wine)
