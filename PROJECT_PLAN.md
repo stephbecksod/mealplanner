@@ -135,14 +135,21 @@ meal-planner/
 - ✅ Display meal + side + cocktail + wine together on card
 - ✅ Redesigned meal cards with compact sections
 
-### Phase 5: Smart Optimization & Polish
+### Phase 5: Smart Optimization & Polish (IN PROGRESS)
 **Goal**: Optimize user experience and prepare for scaling
 - [ ] Ingredient overlap optimization across the week
-- [ ] Improved UI/UX with loading states
+- ✅ Improved UI/UX with loading states (add side dish, cocktail, wine buttons)
 - [ ] Error handling and offline support
 - [ ] Prepare architecture for future multi-user support
 - [ ] Add confirmation dialogs for destructive actions
-- [ ] Ability to add a dinner from favorite recipes
+- ✅ Ability to add a dinner from favorite recipes
+- ✅ Add side dishes and cocktails from favorites to specific days
+- ✅ A la carte items (standalone sides/cocktails at end of meal plan)
+- ✅ "Included in Week" state for items already in meal plan
+- ✅ Day numbering format ("Day 1", "Day 2" instead of weekday names)
+- ✅ "Add Meal" button with generate new or add from favorites options
+- ✅ Multiple side dishes per meal support
+- ✅ Multiple cocktails per meal support
 
 ## Key Technical Decisions
 - **Single-user mode initially**, but data structure designed for future user accounts
@@ -159,14 +166,17 @@ meal-planner/
 {
   id: string,
   createdAt: timestamp,
+  dietaryPreferences: [string],
+  cuisinePreferences: [string],
   dinners: [
     {
       id: string,
-      dayOfWeek: string,
-      mainDish: Recipe,        // Renamed from 'recipe'
-      sideDish: SideDish | null,
+      dayOfWeek: string,          // "Day 1", "Day 2", etc.
+      mainDish: Recipe | null,    // null for a la carte items
+      sideDishes: [SideDish],     // Array - supports multiple sides
       servings: number,
-      beveragePairing: BeveragePairing | null
+      beveragePairing: BeveragePairing | null,
+      isAlaCarte: boolean         // true for standalone sides/cocktails
     }
   ]
 }
@@ -217,18 +227,20 @@ meal-planner/
 ### Beverage Pairing
 ```javascript
 {
-  cocktail: {
-    id: string,
-    name: string,
-    ingredients: [
-      {
-        item: string,
-        quantity: string
-      }
-    ],
-    instructions: [string],
-    flavorProfile: string
-  } | null,
+  cocktails: [              // Array - supports multiple cocktails
+    {
+      id: string,
+      name: string,
+      ingredients: [
+        {
+          item: string,
+          quantity: string
+        }
+      ],
+      instructions: [string],
+      flavorProfile: string
+    }
+  ],
   wine: {
     type: string,
     description: string,
@@ -318,38 +330,49 @@ meal-planner/
 ## Recent Changes (Latest Session)
 
 ### Completed in This Session:
-1. **Side Dish Feature** - Full implementation including:
-   - Backend generation with Claude API
-   - Add/remove side dishes per meal
-   - SideDishDetail modal component
-   - Save to favorites functionality
+1. **Meal Plan Page Improvements**:
+   - Day labels now show "Day 1", "Day 2" instead of weekday names
+   - "Add Meal" button opens modal with two options:
+     - Generate New Meal (AI-powered)
+     - Add from Favorites (saved recipes)
+   - Loading indicators on Add Side Dish, Add Cocktail, Add Wine buttons
+   - Visual feedback with spinner and "Generating..." text
 
-2. **Beverage Pairing Separation** - Split into independent features:
-   - Separate "Add Cocktail" and "Add Wine Pairing" buttons
-   - Individual remove options for each
-   - BeverageDetail modal for viewing details
+2. **Multiple Items Per Meal**:
+   - Meals can now have multiple side dishes (array instead of single)
+   - Meals can now have multiple cocktails (array instead of single)
+   - Each item has individual View/Favorite/Remove buttons
+   - Grocery list updated to handle multiple items
 
-3. **Meal Card Redesign** - New compact layout with sections:
-   - Main dish with View Recipe + favorite star
-   - Side dish with View Recipe + favorite star
-   - Cocktail with View Recipe + favorite star
-   - Wine with View Pairing (aligned with other buttons)
+3. **Add to Week from Favorites**:
+   - "Add to Week" button on all Favorites cards (recipes, sides, cocktails)
+   - Recipes add directly as new meal day
+   - Side dishes and cocktails show modal to:
+     - Select specific day to add to
+     - Or add as "A la carte" (standalone item)
+   - "Included in Week" state shows for items already in plan
+   - Loading spinner when adding items
 
-4. **Grocery List Updates**:
-   - "Include beverage ingredients" toggle
-   - Wines section with checkboxes
-   - Handles mainDish, sideDish, and cocktail ingredients
+4. **A La Carte Items**:
+   - Standalone side dishes or cocktails without main dish
+   - Purple "A la carte" header instead of day number
+   - Always appear at end of meal plan
+   - Hide irrelevant sections (no cocktail section for side-only, vice versa)
+   - Ingredients included in grocery list
 
-5. **Home Page Toggles**:
-   - Include Side Dishes (green toggle)
-   - Include Cocktails (green toggle)
-   - Include Wine Pairing (green toggle)
+5. **Data Migration**:
+   - Automatic migration from old format (sideDish → sideDishes array)
+   - Automatic migration from old format (cocktail → cocktails array)
+   - Backward compatible with existing saved data
 
-6. **Favorites Page Updates**:
-   - Added Side Dishes section
-   - Redesigned Cocktails to match Recipe card style
-
-7. **Toggle Favorites** - Click star to save, click again to remove
+### Previous Session:
+- Side Dish Feature with AI generation
+- Beverage Pairing (separate cocktail/wine)
+- Meal Card redesign with compact sections
+- Grocery List with beverage toggle
+- Home Page generation toggles
+- Favorites Page with Side Dishes section
+- Star toggle for favorites
 
 ## Future Enhancements (Post-MVP)
 - User authentication and accounts
