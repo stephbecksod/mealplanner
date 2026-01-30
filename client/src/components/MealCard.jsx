@@ -27,7 +27,20 @@ const MealCard = ({ dinner, dayNumber, onRegenerate, onRemove, showActions = tru
     itemName: null,
   })
 
-  const { saveRecipe, saveCocktail, isRecipeSaved, isCocktailSaved, saveSideDish, isSideDishSaved, removeRecipe, removeSideDish: removeSideDishFromFavorites, removeCocktail: removeCocktailFromFavorites } = useFavorites()
+  const {
+    saveRecipe,
+    saveCocktail,
+    saveSideDish,
+    removeRecipe,
+    removeSideDish: removeSideDishFromFavorites,
+    removeCocktail: removeCocktailFromFavorites,
+    isRecipeSavedByName,
+    isCocktailSavedByName,
+    isSideDishSavedByName,
+    savedRecipes,
+    savedCocktails,
+    savedSideDishes,
+  } = useFavorites()
   const { showError } = useToast()
   const {
     addSideDish,
@@ -57,29 +70,41 @@ const MealCard = ({ dinner, dayNumber, onRegenerate, onRemove, showActions = tru
   const showSideSection = !isAlaCarte || hasSideDishes || mainDish
   const showCocktailSection = !isAlaCarte || hasCocktails || mainDish
 
-  const isMainSaved = mainDish && isRecipeSaved(mainDish.id)
+  const isMainSaved = mainDish && isRecipeSavedByName(mainDish.name)
 
   const handleToggleMainFavorite = () => {
     if (isMainSaved) {
-      removeRecipe(mainDish.id)
+      // Find the saved recipe by name to get the correct DB ID
+      const savedRecipe = savedRecipes.find(r => r.name === mainDish.name)
+      if (savedRecipe) {
+        removeRecipe(savedRecipe.id)
+      }
     } else {
       saveRecipe(mainDish)
     }
   }
 
   const handleToggleSideFavorite = (sideDish) => {
-    const isSaved = isSideDishSaved ? isSideDishSaved(sideDish.id) : false
+    const isSaved = isSideDishSavedByName(sideDish.name)
     if (isSaved) {
-      removeSideDishFromFavorites(sideDish.id)
-    } else if (saveSideDish) {
+      // Find the saved side dish by name to get the correct DB ID
+      const savedSide = savedSideDishes.find(s => s.name === sideDish.name)
+      if (savedSide) {
+        removeSideDishFromFavorites(savedSide.id)
+      }
+    } else {
       saveSideDish(sideDish)
     }
   }
 
   const handleToggleCocktailFavorite = (cocktail) => {
-    const isSaved = isCocktailSaved(cocktail.id)
+    const isSaved = isCocktailSavedByName(cocktail.name)
     if (isSaved) {
-      removeCocktailFromFavorites(cocktail.id)
+      // Find the saved cocktail by name to get the correct DB ID
+      const savedCocktail = savedCocktails.find(c => c.name === cocktail.name)
+      if (savedCocktail) {
+        removeCocktailFromFavorites(savedCocktail.id)
+      }
     } else {
       saveCocktail(cocktail)
     }
@@ -270,7 +295,7 @@ const MealCard = ({ dinner, dayNumber, onRegenerate, onRemove, showActions = tru
           {sideDishes.length > 0 ? (
             <div className="space-y-2">
               {sideDishes.map((sideDish, idx) => {
-                const isSaved = isSideDishSaved ? isSideDishSaved(sideDish.id) : false
+                const isSaved = isSideDishSavedByName(sideDish.name)
                 return (
                   <div key={sideDish.id || idx} className="flex items-center justify-between py-1">
                     <div className="flex-1">
@@ -357,7 +382,7 @@ const MealCard = ({ dinner, dayNumber, onRegenerate, onRemove, showActions = tru
           {cocktails.length > 0 ? (
             <div className="space-y-2">
               {cocktails.map((cocktail, idx) => {
-                const isSaved = isCocktailSaved(cocktail.id)
+                const isSaved = isCocktailSavedByName(cocktail.name)
                 return (
                   <div key={cocktail.id || idx} className="flex items-center justify-between py-1">
                     <div className="flex-1">
