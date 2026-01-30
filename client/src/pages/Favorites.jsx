@@ -4,6 +4,7 @@ import { useMealPlan } from '../context/MealPlanContext'
 import RecipeDetail from '../components/RecipeDetail'
 import SideDishDetail from '../components/SideDishDetail'
 import BeverageDetail from '../components/BeverageDetail'
+import ConfirmationModal from '../components/ConfirmationModal'
 
 const Favorites = () => {
   const { savedRecipes, savedCocktails, savedSideDishes, removeRecipe, removeCocktail, removeSideDish } = useFavorites()
@@ -20,6 +21,14 @@ const Favorites = () => {
   // Loading and recently added states
   const [addingItemId, setAddingItemId] = useState(null)
   const [recentlyAddedIds, setRecentlyAddedIds] = useState(new Set())
+
+  // Confirmation modal state
+  const [confirmModal, setConfirmModal] = useState({
+    isOpen: false,
+    type: null, // 'recipe' | 'sideDish' | 'cocktail'
+    itemId: null,
+    itemName: null,
+  })
 
   const filteredRecipes = savedRecipes.filter(recipe =>
     recipe.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -123,6 +132,31 @@ const Favorites = () => {
     }
   }
 
+  const handleRemoveClick = (type, item) => {
+    setConfirmModal({
+      isOpen: true,
+      type,
+      itemId: item.id,
+      itemName: item.name,
+    })
+  }
+
+  const handleConfirmRemove = () => {
+    if (confirmModal.type === 'recipe') {
+      removeRecipe(confirmModal.itemId)
+    } else if (confirmModal.type === 'sideDish') {
+      removeSideDish(confirmModal.itemId)
+    } else if (confirmModal.type === 'cocktail') {
+      removeCocktail(confirmModal.itemId)
+    }
+    setConfirmModal({ isOpen: false, type: null, itemId: null, itemName: null })
+  }
+
+  const getConfirmMessage = () => {
+    const typeLabel = confirmModal.type === 'sideDish' ? 'side dish' : confirmModal.type
+    return `Remove "${confirmModal.itemName}" from your saved ${typeLabel}s?`
+  }
+
   return (
     <div className="max-w-6xl mx-auto">
       <h1 className="text-3xl font-bold text-gray-800 mb-6">Saved Favorites</h1>
@@ -214,11 +248,7 @@ const Favorites = () => {
                       )
                     })()}
                     <button
-                      onClick={() => {
-                        if (confirm('Remove this recipe from favorites?')) {
-                          removeRecipe(recipe.id)
-                        }
-                      }}
+                      onClick={() => handleRemoveClick('recipe', recipe)}
                       className="px-3 py-2 bg-red-100 text-red-700 hover:bg-red-200 rounded-lg text-sm font-semibold"
                     >
                       Remove
@@ -306,11 +336,7 @@ const Favorites = () => {
                       )
                     })()}
                     <button
-                      onClick={() => {
-                        if (confirm('Remove this side dish from favorites?')) {
-                          removeSideDish(sideDish.id)
-                        }
-                      }}
+                      onClick={() => handleRemoveClick('sideDish', sideDish)}
                       className="px-3 py-2 bg-red-100 text-red-700 hover:bg-red-200 rounded-lg text-sm font-semibold"
                     >
                       Remove
@@ -386,11 +412,7 @@ const Favorites = () => {
                       )
                     })()}
                     <button
-                      onClick={() => {
-                        if (confirm('Remove this cocktail from favorites?')) {
-                          removeCocktail(cocktail.id)
-                        }
-                      }}
+                      onClick={() => handleRemoveClick('cocktail', cocktail)}
                       className="px-3 py-2 bg-red-100 text-red-700 hover:bg-red-200 rounded-lg text-sm font-semibold"
                     >
                       Remove
@@ -510,6 +532,16 @@ const Favorites = () => {
           </div>
         </div>
       )}
+
+      <ConfirmationModal
+        isOpen={confirmModal.isOpen}
+        onClose={() => setConfirmModal({ isOpen: false, type: null, itemId: null, itemName: null })}
+        onConfirm={handleConfirmRemove}
+        title="Remove from Favorites"
+        message={getConfirmMessage()}
+        confirmText="Remove"
+        confirmStyle="danger"
+      />
     </div>
   )
 }

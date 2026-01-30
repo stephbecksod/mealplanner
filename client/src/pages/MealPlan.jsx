@@ -1,12 +1,14 @@
 import { useState } from 'react'
 import { useMealPlan } from '../context/MealPlanContext'
 import { useFavorites } from '../context/FavoritesContext'
+import { useToast } from '../components/Toast'
 import MealCard from '../components/MealCard'
 import GroceryList from '../components/GroceryList'
 
 const MealPlan = () => {
   const { mealPlan, regenerateMeal, removeMeal, clearMealPlan, loading, addMeal, generateNewMeal } = useMealPlan()
   const { savedRecipes } = useFavorites()
+  const { showError } = useToast()
   const [showConfirm, setShowConfirm] = useState(false)
   const [confirmType, setConfirmType] = useState(null)
   const [confirmMealId, setConfirmMealId] = useState(null)
@@ -64,6 +66,11 @@ const MealPlan = () => {
       }
     } catch (error) {
       console.error('Action failed:', error)
+      if (confirmType === 'regenerate') {
+        showError('Failed to regenerate meal. Please try again.')
+      } else if (confirmType === 'remove') {
+        showError('Failed to remove meal. Please try again.')
+      }
     } finally {
       setShowConfirm(false)
       setConfirmType(null)
@@ -83,6 +90,7 @@ const MealPlan = () => {
       setShowAddMealModal(false)
     } catch (error) {
       console.error('Failed to generate new meal:', error)
+      showError('Failed to generate new meal. Please try again.')
     } finally {
       setGeneratingMeal(false)
     }
@@ -222,26 +230,52 @@ const MealPlan = () => {
             </div>
 
             {/* Favorites Section */}
-            {savedRecipes.length === 0 ? (
-              <p className="text-gray-500 text-center py-4">
-                No saved recipes yet. Save some favorites first!
-              </p>
-            ) : (
-              <div className="space-y-3">
-                {savedRecipes.map((recipe) => (
-                  <div key={recipe.id} className="border border-gray-200 rounded-lg p-4 hover:border-gray-300 transition-colors">
-                    <h4 className="font-bold text-gray-800">{recipe.name}</h4>
-                    <p className="text-sm text-gray-600 mb-2">{recipe.cuisine}</p>
-                    <button
-                      onClick={() => handleAddFromFavorites(recipe)}
-                      className="btn-primary text-sm"
-                    >
-                      Add to Week
-                    </button>
+            {(() => {
+              // Get names of recipes already in the meal plan
+              const existingRecipeNames = mealPlan.dinners
+                .filter(d => d.mainDish)
+                .map(d => d.mainDish.name.toLowerCase())
+
+              // Filter out recipes already in the plan
+              const availableFavorites = savedRecipes.filter(
+                recipe => !existingRecipeNames.includes(recipe.name.toLowerCase())
+              )
+
+              if (savedRecipes.length === 0) {
+                return (
+                  <p className="text-gray-500 text-center py-4">
+                    No favorites saved
+                  </p>
+                )
+              }
+
+              if (availableFavorites.length === 0) {
+                return (
+                  <div className="text-center py-4 px-4 bg-gray-50 rounded-lg">
+                    <p className="text-gray-600">
+                      All favorite meals are already included in the meal plan
+                    </p>
                   </div>
-                ))}
-              </div>
-            )}
+                )
+              }
+
+              return (
+                <div className="space-y-3">
+                  {availableFavorites.map((recipe) => (
+                    <div key={recipe.id} className="border border-gray-200 rounded-lg p-4 hover:border-gray-300 transition-colors">
+                      <h4 className="font-bold text-gray-800">{recipe.name}</h4>
+                      <p className="text-sm text-gray-600 mb-2">{recipe.cuisine}</p>
+                      <button
+                        onClick={() => handleAddFromFavorites(recipe)}
+                        className="btn-primary text-sm"
+                      >
+                        Add to Week
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )
+            })()}
           </div>
         </div>
       )}

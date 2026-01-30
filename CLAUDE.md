@@ -18,26 +18,31 @@ A browser-based dinner planning application that helps users create weekly meal 
 - **AI Integration**: Anthropic Claude API
   - *Why*: Superior reasoning for recipe generation, natural language understanding
 
-- **Storage**: Browser localStorage
-  - *Why*: Simple single-user implementation, no backend database needed initially
-  - *Future*: Architecture designed to easily migrate to PostgreSQL/MongoDB for multi-user
+- **Database**: Supabase (PostgreSQL)
+  - *Why*: Managed PostgreSQL with built-in auth, real-time, and Row Level Security
+  - Enables cross-device sync and multi-user support
+
+- **Authentication**: Supabase Auth
+  - *Why*: Integrated with database, handles sessions, supports multiple providers
 
 - **Styling**: Tailwind CSS
   - *Why*: Rapid UI development, consistent design system, small production bundle
 
 ### Architecture Patterns
 - **State Management**: React Context API
-  - Sufficient for single-user app, avoids Redux complexity
-  - Can upgrade to Redux Toolkit if state becomes complex
+  - AuthContext for user session
+  - MealPlanContext for current meal plan (fetches from Supabase)
+  - FavoritesContext for saved items (optimistic updates)
 
 - **API Design**: RESTful endpoints
   - Clear separation of concerns
   - Easy to understand and extend
 
 - **Data Persistence Strategy**:
-  - localStorage keys namespaced for future multi-user support
-  - Data models designed to match potential database schemas
-  - Migration path documented for scaling
+  - All data stored in Supabase PostgreSQL
+  - Row Level Security ensures users only access their own data
+  - Contexts fetch data on user login, save on changes
+  - Legacy localStorage migration for existing users
 
 ## File Structure
 
@@ -51,15 +56,23 @@ meal-planner/
 │   │   │   ├── GroceryList.jsx       # Interactive grocery checklist
 │   │   │   ├── RecipeDetail.jsx      # Full recipe view
 │   │   │   ├── BeveragePairing.jsx   # Cocktail/wine display
-│   │   │   └── Navigation.jsx        # App navigation bar
+│   │   │   ├── Navigation.jsx        # App navigation bar
+│   │   │   ├── ProtectedRoute.jsx    # Auth-required route wrapper
+│   │   │   ├── DataMigrationModal.jsx # localStorage to Supabase migration
+│   │   │   └── OfflineBanner.jsx     # Network status indicator
 │   │   ├── pages/                    # Main application views
 │   │   │   ├── Home.jsx              # Landing/meal plan generator
 │   │   │   ├── MealPlan.jsx          # Current week's meals
-│   │   │   └── Favorites.jsx         # Saved recipes
+│   │   │   ├── Favorites.jsx         # Saved recipes
+│   │   │   ├── Login.jsx             # User login
+│   │   │   └── Register.jsx          # User registration
 │   │   ├── services/                 # External interactions
 │   │   │   ├── api.js                # Backend API client (axios)
-│   │   │   └── storage.js            # localStorage wrapper
+│   │   │   ├── supabase.js           # Supabase client initialization
+│   │   │   ├── supabaseData.js       # Supabase data services
+│   │   │   └── storage.js            # localStorage wrapper (legacy/migration)
 │   │   ├── context/                  # React Context providers
+│   │   │   ├── AuthContext.jsx       # User authentication state
 │   │   │   ├── MealPlanContext.jsx   # Current meal plan state
 │   │   │   └── FavoritesContext.jsx  # Saved recipes state
 │   │   ├── utils/                    # Helper functions
@@ -88,6 +101,10 @@ meal-planner/
 │   ├── .env.example                  # Environment variables template
 │   └── package.json
 │
+├── supabase/                         # Database configuration
+│   └── migrations/                   # SQL migration files
+│       └── 001_initial_schema.sql    # Tables, RLS policies, triggers
+│
 ├── .gitignore                        # Git ignore rules
 ├── PROJECT_PLAN.md                   # Detailed feature roadmap
 ├── CLAUDE.md                         # This file
@@ -99,6 +116,7 @@ meal-planner/
 ### Prerequisites
 - Node.js 18+ and npm
 - Anthropic API key ([get one here](https://console.anthropic.com/))
+- Supabase project ([create one here](https://supabase.com/))
 
 ### Initial Setup
 
@@ -125,7 +143,19 @@ meal-planner/
    NODE_ENV=development
    ```
 
-4. **Start development servers**
+4. **Set up Supabase**
+
+   Create a `.env` file in the `client/` directory:
+   ```
+   VITE_SUPABASE_URL=your_supabase_project_url
+   VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
+   ```
+
+   Run the database migration in Supabase SQL Editor:
+   - Copy contents of `supabase/migrations/001_initial_schema.sql`
+   - Run in Supabase Dashboard > SQL Editor
+
+5. **Start development servers**
    ```bash
    cd ..
    npm run dev
@@ -179,8 +209,9 @@ npm start
 
 5. **Testing**
    - Test all user flows manually
-   - Check localStorage persistence
+   - Check Supabase data persistence (Dashboard > Table Editor)
    - Verify error handling
+   - Test cross-device sync by logging in on different browsers
 
 ### Code Style Guidelines
 
@@ -193,18 +224,36 @@ npm start
 - **Comments**: Add JSDoc for complex functions
 - **Error handling**: Always include try-catch for API calls
 
-### localStorage Keys
+### Data Storage
 
-Current schema:
+All data is stored in Supabase PostgreSQL with Row Level Security:
+
+| Table | Description |
+|-------|-------------|
+| `meal_plans` | User's meal plans with preferences |
+| `dinners` | Individual meals within a plan |
+| `saved_recipes` | Favorited main dish recipes |
+| `saved_cocktails` | Favorited cocktail recipes |
+| `saved_side_dishes` | Favorited side dish recipes |
+| `grocery_lists` | Shopping lists linked to meal plans |
+| `user_preferences` | User default settings |
+
+**Data Services** (in `supabaseData.js`):
+- `mealPlanService` - CRUD for meal plans and dinners
+- `favoritesService` - CRUD for saved recipes/cocktails/sides
+- `migrationService` - localStorage to Supabase migration
+
+### Legacy localStorage Keys (migration only)
+
+These keys are only used for migrating existing users:
 ```javascript
-'meal-planner:currentMealPlan'    // Active meal plan
-'meal-planner:savedRecipes'        // Favorite recipes array
-'meal-planner:savedCocktails'      // Favorite cocktails array
-'meal-planner:userPreferences'     // User settings
-'meal-planner:groceryList'         // Current grocery list
+'meal-planner:currentMealPlan'    // Migrated to meal_plans + dinners
+'meal-planner:savedRecipes'        // Migrated to saved_recipes
+'meal-planner:savedCocktails'      // Migrated to saved_cocktails
+'meal-planner:savedSideDishes'     // Migrated to saved_side_dishes
+'meal-planner:groceryList'         // Migrated to grocery_lists
+'meal-planner:migrated'            // Flag to skip migration prompt
 ```
-
-**Important**: Always use the `storage.js` service to interact with localStorage to ensure consistency and easy future migration.
 
 ## Git Commit Guidelines
 
@@ -315,12 +364,16 @@ Returns: CategorizedGroceryList
 - Check API response formats match expected schema
 - Monitor Claude API usage in Anthropic console
 
-### localStorage Issues
-- Clear localStorage if schema changes:
-  ```javascript
-  localStorage.clear()
-  ```
-- Use `storage.js` service for all access
+### Supabase Issues
+- Check Supabase Dashboard > Logs for API errors
+- Verify RLS policies in Dashboard > Authentication > Policies
+- Check user session: `supabase.auth.getSession()`
+- View data in Dashboard > Table Editor
+- Test RLS by running queries in SQL Editor with `set role authenticated`
+
+### localStorage Issues (Migration)
+- Migration not triggering? Check `meal-planner:migrated` flag
+- Clear all localStorage: `localStorage.clear()`
 - Check Application > Local Storage in DevTools
 
 ## Performance Considerations
@@ -330,14 +383,24 @@ Returns: CategorizedGroceryList
 - Consider caching frequently used data
 - Batch grocery list updates when adding/removing meals
 
-## Future Migration Path
+## Multi-User Architecture (Completed)
 
-When scaling to multi-user:
-1. Replace localStorage with database (PostgreSQL recommended)
-2. Add authentication (JWT or session-based)
-3. Update API to include user context
-4. Add user registration/login pages
-5. Deploy backend to cloud (Heroku, Railway, or AWS)
-6. Deploy frontend to Vercel/Netlify
+The app now supports multiple users with Supabase:
 
-Data models are already designed with this in mind - each record can easily add a `userId` field.
+- **Database**: PostgreSQL with Row Level Security (RLS)
+- **Authentication**: Supabase Auth (email/password)
+- **Data Isolation**: RLS policies ensure users only see their own data
+- **Cross-Device Sync**: Data persists in cloud, accessible from any device
+
+### Deployment Options
+
+**Frontend** (static hosting):
+- Vercel, Netlify, or Cloudflare Pages
+- Set `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` env vars
+
+**Backend** (Node.js hosting):
+- Railway, Render, Heroku, or AWS
+- Set `ANTHROPIC_API_KEY` env var
+
+**Database**:
+- Already hosted on Supabase (managed PostgreSQL)

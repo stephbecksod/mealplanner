@@ -39,13 +39,13 @@ class ClaudeService {
     return this.parseRecipesResponse(response, includeSides)
   }
 
-  async regenerateRecipe({ dietaryPreferences, cuisinePreferences, servings, includeSides = false }) {
-    const prompt = this.buildRecipePrompt({
-      numberOfMeals: 1,
+  async regenerateRecipe({ dietaryPreferences, cuisinePreferences, servings, includeSides = false, existingMeals = [] }) {
+    const prompt = this.buildRegeneratePrompt({
       dietaryPreferences,
       cuisinePreferences,
       servings,
       includeSides,
+      existingMeals,
     })
 
     const response = await this.generateCompletion(prompt)
@@ -83,7 +83,15 @@ class ClaudeService {
     prompt += `Servings: ${servings || 4} people\n\n`
 
     if (numberOfMeals > 1) {
-      prompt += `Important: Make the recipes diverse but use overlapping ingredients where possible to simplify grocery shopping.\n\n`
+      prompt += `IMPORTANT - Ingredient Overlap Strategy:
+- Design recipes that share common ingredients to minimize grocery shopping complexity
+- Aim for 40-60% ingredient overlap across the week's meals
+- Prioritize sharing versatile proteins (e.g., chicken across multiple dishes prepared differently)
+- Reuse pantry staples (onions, garlic, olive oil, common spices)
+- Share produce items that can be used in multiple ways (e.g., bell peppers in stir-fry and fajitas)
+- Each recipe should still be distinct and flavorful despite shared ingredients
+
+Example strategy: If one meal uses chicken breasts, another could use chicken thighs. If one uses fresh herbs, find ways to use them in other meals too.\n\n`
     }
 
     if (includeSides) {
@@ -166,6 +174,124 @@ class ClaudeService {
     }
 
     prompt += `\n\nGenerate creative, delicious recipes that are practical to make at home. Ensure ingredients have proper quantities and units.`
+
+    return prompt
+  }
+
+  buildRegeneratePrompt({ dietaryPreferences, cuisinePreferences, servings, includeSides, existingMeals }) {
+    let prompt = `Generate 1 new dinner recipe with the following requirements:\n\n`
+
+    if (dietaryPreferences && dietaryPreferences.length > 0) {
+      prompt += `Dietary Preferences: ${dietaryPreferences.join(', ')}\n`
+    }
+
+    if (cuisinePreferences && cuisinePreferences.length > 0) {
+      prompt += `Cuisine Preferences: ${cuisinePreferences.join(', ')}\n`
+    }
+
+    prompt += `Servings: ${servings || 4} people\n\n`
+
+    // Add existing meals context for ingredient overlap
+    if (existingMeals && existingMeals.length > 0) {
+      prompt += `IMPORTANT - Ingredient Overlap Optimization:
+This recipe will be part of a weekly meal plan. Here are the other meals already in the plan:
+
+`
+      existingMeals.forEach((meal, i) => {
+        prompt += `Meal ${i + 1}: ${meal.name}\n`
+        if (meal.ingredients && meal.ingredients.length > 0) {
+          prompt += `  Key ingredients: ${meal.ingredients.slice(0, 8).join(', ')}\n`
+        }
+      })
+
+      prompt += `
+Please design a NEW recipe that:
+- Is distinct and different from the existing meals
+- Reuses some ingredients from the meals above when practical (aim for 30-50% overlap)
+- Prioritizes sharing pantry staples, proteins, and fresh produce
+- Still creates an interesting, flavorful dish\n\n`
+    }
+
+    if (includeSides) {
+      prompt += `Include a complementary side dish. The side dish should:
+- Balance the meal (if main is heavy, use a light vegetable/salad; if main lacks carbs, suggest pasta/rice/potatoes)
+- Match the cuisine style of the main dish
+- Be practical to prepare alongside the main dish\n\n`
+
+      prompt += `Provide the recipe in this exact JSON format:
+{
+  "recipes": [
+    {
+      "name": "Recipe Name",
+      "cuisine": "cuisine type",
+      "dietaryInfo": ["vegetarian", "gluten-free", etc.],
+      "servings": ${servings || 4},
+      "prepTime": prep time in minutes,
+      "cookTime": cook time in minutes,
+      "ingredients": [
+        {
+          "item": "ingredient name",
+          "quantity": "amount with unit",
+          "category": "produce|protein|dairy|pantry|spices|other"
+        }
+      ],
+      "instructions": [
+        "step 1",
+        "step 2",
+        etc.
+      ],
+      "sideDish": {
+        "name": "Side Dish Name",
+        "type": "vegetable|starch|salad",
+        "prepTime": prep time in minutes,
+        "cookTime": cook time in minutes,
+        "ingredients": [
+          {
+            "item": "ingredient name",
+            "quantity": "amount with unit",
+            "category": "produce|protein|dairy|pantry|spices|other"
+          }
+        ],
+        "instructions": [
+          "step 1",
+          "step 2",
+          etc.
+        ],
+        "dietaryInfo": ["vegetarian", "gluten-free", etc.],
+        "complementReason": "Brief explanation of why this side pairs well with the main dish"
+      }
+    }
+  ]
+}`
+    } else {
+      prompt += `Provide the recipe in this exact JSON format:
+{
+  "recipes": [
+    {
+      "name": "Recipe Name",
+      "cuisine": "cuisine type",
+      "dietaryInfo": ["vegetarian", "gluten-free", etc.],
+      "servings": ${servings || 4},
+      "prepTime": prep time in minutes,
+      "cookTime": cook time in minutes,
+      "ingredients": [
+        {
+          "item": "ingredient name",
+          "quantity": "amount with unit",
+          "category": "produce|protein|dairy|pantry|spices|other"
+        }
+      ],
+      "instructions": [
+        "step 1",
+        "step 2",
+        etc.
+      ]
+    }
+  ]
+}`
+    }
+
+    prompt += `\n\nGenerate a creative, delicious recipe that is practical to make at home. Ensure ingredients have proper quantities and units.`
 
     return prompt
   }

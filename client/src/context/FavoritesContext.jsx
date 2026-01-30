@@ -1,5 +1,6 @@
-import { createContext, useContext, useState, useEffect } from 'react'
-import storage from '../services/storage'
+import { createContext, useContext, useState, useEffect, useCallback } from 'react'
+import { useAuth } from './AuthContext'
+import { favoritesService } from '../services/supabaseData'
 
 const FavoritesContext = createContext()
 
@@ -12,63 +13,196 @@ export const useFavorites = () => {
 }
 
 export const FavoritesProvider = ({ children }) => {
+  const { user, isAuthenticated } = useAuth()
   const [savedRecipes, setSavedRecipes] = useState([])
   const [savedCocktails, setSavedCocktails] = useState([])
   const [savedSideDishes, setSavedSideDishes] = useState([])
+  const [dataLoading, setDataLoading] = useState(true)
+  const [error, setError] = useState(null)
+
+  // Fetch favorites from Supabase when user changes
+  const fetchFavorites = useCallback(async () => {
+    if (!isAuthenticated) {
+      setSavedRecipes([])
+      setSavedCocktails([])
+      setSavedSideDishes([])
+      setDataLoading(false)
+      return
+    }
+
+    setDataLoading(true)
+    setError(null)
+
+    try {
+      const [recipes, cocktails, sideDishes] = await Promise.all([
+        favoritesService.getSavedRecipes(),
+        favoritesService.getSavedCocktails(),
+        favoritesService.getSavedSideDishes(),
+      ])
+
+      setSavedRecipes(recipes)
+      setSavedCocktails(cocktails)
+      setSavedSideDishes(sideDishes)
+    } catch (err) {
+      console.error('Error fetching favorites:', err)
+      setError(err.message)
+    } finally {
+      setDataLoading(false)
+    }
+  }, [isAuthenticated])
 
   useEffect(() => {
-    const recipes = storage.getSavedRecipes()
-    const cocktails = storage.getSavedCocktails()
-    const sideDishes = storage.getSavedSideDishes()
+    fetchFavorites()
+  }, [fetchFavorites, user?.id])
 
-    setSavedRecipes(recipes)
-    setSavedCocktails(cocktails)
-    setSavedSideDishes(sideDishes)
-  }, [])
-
-  const saveRecipe = (recipe) => {
+  // Save recipe with optimistic update
+  const saveRecipe = async (recipe) => {
     const recipeWithId = {
       ...recipe,
       id: recipe.id || `recipe-${Date.now()}`,
     }
 
-    const isAlreadySaved = savedRecipes.some(r => r.id === recipeWithId.id || r.name === recipeWithId.name)
-
+    // Check if already saved (by name to handle different IDs)
+    const isAlreadySaved = savedRecipes.some(r => r.name === recipeWithId.name)
     if (isAlreadySaved) {
       return false
     }
 
-    storage.addSavedRecipe(recipeWithId)
-    setSavedRecipes(storage.getSavedRecipes())
-    return true
+    // Optimistic update
+    const optimisticRecipe = { ...recipeWithId, savedAt: Date.now() }
+    setSavedRecipes(prev => [optimisticRecipe, ...prev])
+
+    try {
+      const savedRecipe = await favoritesService.saveRecipe(recipeWithId)
+      if (!savedRecipe) {
+        // Recipe was a duplicate
+        setSavedRecipes(prev => prev.filter(r => r.id !== optimisticRecipe.id))
+        return false
+      }
+      // Replace optimistic entry with actual DB entry
+      setSavedRecipes(prev => prev.map(r =>
+        r.id === optimisticRecipe.id ? savedRecipe : r
+      ))
+      return true
+    } catch (err) {
+      // Rollback optimistic update
+      console.error('Error saving recipe:', err)
+      setSavedRecipes(prev => prev.filter(r => r.id !== optimisticRecipe.id))
+      return false
+    }
   }
 
-  const removeRecipe = (recipeId) => {
-    storage.removeSavedRecipe(recipeId)
-    setSavedRecipes(storage.getSavedRecipes())
+  // Remove recipe with optimistic update
+  const removeRecipe = async (recipeId) => {
+    const recipeToRemove = savedRecipes.find(r => r.id === recipeId)
+    if (!recipeToRemove) return
+
+    // Optimistic update
+    setSavedRecipes(prev => prev.filter(r => r.id !== recipeId))
+
+    try {
+      await favoritesService.removeRecipe(recipeId)
+    } catch (err) {
+      // Rollback optimistic update
+      console.error('Error removing recipe:', err)
+      setSavedRecipes(prev => [...prev, recipeToRemove])
+    }
   }
 
-  const saveCocktail = (cocktail) => {
+  // Save cocktail with optimistic update
+  const saveCocktail = async (cocktail) => {
     const cocktailWithId = {
       ...cocktail,
       id: cocktail.id || `cocktail-${Date.now()}`,
     }
 
-    const isAlreadySaved = savedCocktails.some(c => c.id === cocktailWithId.id || c.name === cocktailWithId.name)
-
+    const isAlreadySaved = savedCocktails.some(c => c.name === cocktailWithId.name)
     if (isAlreadySaved) {
       return false
     }
 
-    storage.addSavedCocktail(cocktailWithId)
-    setSavedCocktails(storage.getSavedCocktails())
-    return true
+    // Optimistic update
+    const optimisticCocktail = { ...cocktailWithId, savedAt: Date.now() }
+    setSavedCocktails(prev => [optimisticCocktail, ...prev])
+
+    try {
+      const savedCocktail = await favoritesService.saveCocktail(cocktailWithId)
+      if (!savedCocktail) {
+        setSavedCocktails(prev => prev.filter(c => c.id !== optimisticCocktail.id))
+        return false
+      }
+      setSavedCocktails(prev => prev.map(c =>
+        c.id === optimisticCocktail.id ? savedCocktail : c
+      ))
+      return true
+    } catch (err) {
+      console.error('Error saving cocktail:', err)
+      setSavedCocktails(prev => prev.filter(c => c.id !== optimisticCocktail.id))
+      return false
+    }
   }
 
-  const removeCocktail = (cocktailId) => {
-    const cocktails = savedCocktails.filter(c => c.id !== cocktailId)
-    storage.setSavedCocktails(cocktails)
-    setSavedCocktails(cocktails)
+  // Remove cocktail with optimistic update
+  const removeCocktail = async (cocktailId) => {
+    const cocktailToRemove = savedCocktails.find(c => c.id === cocktailId)
+    if (!cocktailToRemove) return
+
+    setSavedCocktails(prev => prev.filter(c => c.id !== cocktailId))
+
+    try {
+      await favoritesService.removeCocktail(cocktailId)
+    } catch (err) {
+      console.error('Error removing cocktail:', err)
+      setSavedCocktails(prev => [...prev, cocktailToRemove])
+    }
+  }
+
+  // Save side dish with optimistic update
+  const saveSideDish = async (sideDish) => {
+    const sideDishWithId = {
+      ...sideDish,
+      id: sideDish.id || `side-${Date.now()}`,
+    }
+
+    const isAlreadySaved = savedSideDishes.some(s => s.name === sideDishWithId.name)
+    if (isAlreadySaved) {
+      return false
+    }
+
+    // Optimistic update
+    const optimisticSideDish = { ...sideDishWithId, savedAt: Date.now() }
+    setSavedSideDishes(prev => [optimisticSideDish, ...prev])
+
+    try {
+      const saved = await favoritesService.saveSideDish(sideDishWithId)
+      if (!saved) {
+        setSavedSideDishes(prev => prev.filter(s => s.id !== optimisticSideDish.id))
+        return false
+      }
+      setSavedSideDishes(prev => prev.map(s =>
+        s.id === optimisticSideDish.id ? saved : s
+      ))
+      return true
+    } catch (err) {
+      console.error('Error saving side dish:', err)
+      setSavedSideDishes(prev => prev.filter(s => s.id !== optimisticSideDish.id))
+      return false
+    }
+  }
+
+  // Remove side dish with optimistic update
+  const removeSideDish = async (sideDishId) => {
+    const sideDishToRemove = savedSideDishes.find(s => s.id === sideDishId)
+    if (!sideDishToRemove) return
+
+    setSavedSideDishes(prev => prev.filter(s => s.id !== sideDishId))
+
+    try {
+      await favoritesService.removeSideDish(sideDishId)
+    } catch (err) {
+      console.error('Error removing side dish:', err)
+      setSavedSideDishes(prev => [...prev, sideDishToRemove])
+    }
   }
 
   const isRecipeSaved = (recipeId) => {
@@ -79,36 +213,29 @@ export const FavoritesProvider = ({ children }) => {
     return savedCocktails.some(c => c.id === cocktailId)
   }
 
-  const saveSideDish = (sideDish) => {
-    const sideDishWithId = {
-      ...sideDish,
-      id: sideDish.id || `side-${Date.now()}`,
-    }
-
-    const isAlreadySaved = savedSideDishes.some(s => s.id === sideDishWithId.id || s.name === sideDishWithId.name)
-
-    if (isAlreadySaved) {
-      return false
-    }
-
-    storage.addSavedSideDish(sideDishWithId)
-    setSavedSideDishes(storage.getSavedSideDishes())
-    return true
-  }
-
-  const removeSideDish = (sideDishId) => {
-    storage.removeSavedSideDish(sideDishId)
-    setSavedSideDishes(storage.getSavedSideDishes())
-  }
-
   const isSideDishSaved = (sideDishId) => {
     return savedSideDishes.some(s => s.id === sideDishId)
+  }
+
+  // Check by name for items that may have different IDs
+  const isRecipeSavedByName = (recipeName) => {
+    return savedRecipes.some(r => r.name === recipeName)
+  }
+
+  const isCocktailSavedByName = (cocktailName) => {
+    return savedCocktails.some(c => c.name === cocktailName)
+  }
+
+  const isSideDishSavedByName = (sideDishName) => {
+    return savedSideDishes.some(s => s.name === sideDishName)
   }
 
   const value = {
     savedRecipes,
     savedCocktails,
     savedSideDishes,
+    dataLoading,
+    error,
     saveRecipe,
     removeRecipe,
     saveCocktail,
@@ -118,6 +245,10 @@ export const FavoritesProvider = ({ children }) => {
     isRecipeSaved,
     isCocktailSaved,
     isSideDishSaved,
+    isRecipeSavedByName,
+    isCocktailSavedByName,
+    isSideDishSavedByName,
+    refreshFavorites: fetchFavorites,
   }
 
   return <FavoritesContext.Provider value={value}>{children}</FavoritesContext.Provider>

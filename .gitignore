@@ -6,6 +6,7 @@ server/node_modules/
 # Environment variables
 .env
 server/.env
+client/.env
 
 # Build outputs
 client/dist/
@@ -22,3 +23,15 @@ npm-debug.log*
 # OS
 .DS_Store
 Thumbs.db
+
+# Claude Code
+.claude/
+
+# Duplicate/temp folders
+meal-planner-app/
+
+# Windows reserved names
+nul
+
+# Supabase local cache
+supabase/.temp/

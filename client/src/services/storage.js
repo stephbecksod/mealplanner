@@ -1,3 +1,13 @@
+/**
+ * @deprecated This file is no longer used. Data is now stored in Supabase.
+ *
+ * This file is kept for reference only. The localStorage keys and data format
+ * documented here are used by the migration service in supabaseData.js to
+ * migrate existing users' data to Supabase.
+ *
+ * See: supabaseData.js -> migrationService
+ */
+
 const STORAGE_KEYS = {
   CURRENT_MEAL_PLAN: 'meal-planner:currentMealPlan',
   SAVED_RECIPES: 'meal-planner:savedRecipes',

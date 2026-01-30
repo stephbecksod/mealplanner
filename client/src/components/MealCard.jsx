@@ -1,9 +1,11 @@
 import { useState } from 'react'
 import { useFavorites } from '../context/FavoritesContext'
 import { useMealPlan } from '../context/MealPlanContext'
+import { useToast } from './Toast'
 import RecipeDetail from './RecipeDetail'
 import SideDishDetail from './SideDishDetail'
 import BeverageDetail from './BeverageDetail'
+import ConfirmationModal from './ConfirmationModal'
 
 const StarIcon = ({ filled, className = "w-4 h-4" }) => (
   <svg className={className} fill={filled ? 'currentColor' : 'none'} stroke="currentColor" viewBox="0 0 24 24">
@@ -17,7 +19,16 @@ const MealCard = ({ dinner, dayNumber, onRegenerate, onRemove, showActions = tru
   const [showBeverageDetail, setShowBeverageDetail] = useState(null) // 'wine' or cocktail object
   const [loadingAction, setLoadingAction] = useState(null) // 'sideDish', 'cocktail', 'wine'
 
+  // Confirmation modal state
+  const [confirmModal, setConfirmModal] = useState({
+    isOpen: false,
+    type: null, // 'sideDish' | 'cocktail' | 'wine'
+    itemId: null,
+    itemName: null,
+  })
+
   const { saveRecipe, saveCocktail, isRecipeSaved, isCocktailSaved, saveSideDish, isSideDishSaved, removeRecipe, removeSideDish: removeSideDishFromFavorites, removeCocktail: removeCocktailFromFavorites } = useFavorites()
+  const { showError } = useToast()
   const {
     addSideDish,
     removeSideDish,
@@ -80,16 +91,28 @@ const MealCard = ({ dinner, dayNumber, onRegenerate, onRemove, showActions = tru
       await addSideDish(dinner.id)
     } catch (error) {
       console.error('Failed to add side dish:', error)
+      showError('Failed to generate side dish. Please try again.')
     } finally {
       setLoadingAction(null)
     }
   }
 
-  const handleRemoveSideDish = async (sideDishId) => {
+  const handleRemoveSideDishClick = (sideDish) => {
+    setConfirmModal({
+      isOpen: true,
+      type: 'sideDish',
+      itemId: sideDish.id,
+      itemName: sideDish.name,
+    })
+  }
+
+  const handleRemoveSideDish = async () => {
     try {
-      await removeSideDish(dinner.id, sideDishId)
+      await removeSideDish(dinner.id, confirmModal.itemId)
     } catch (error) {
       console.error('Failed to remove side dish:', error)
+    } finally {
+      setConfirmModal({ isOpen: false, type: null, itemId: null, itemName: null })
     }
   }
 
@@ -99,6 +122,7 @@ const MealCard = ({ dinner, dayNumber, onRegenerate, onRemove, showActions = tru
       await addCocktail(dinner.id)
     } catch (error) {
       console.error('Failed to add cocktail:', error)
+      showError('Failed to generate cocktail. Please try again.')
     } finally {
       setLoadingAction(null)
     }
@@ -110,17 +134,38 @@ const MealCard = ({ dinner, dayNumber, onRegenerate, onRemove, showActions = tru
       await addWinePairing(dinner.id)
     } catch (error) {
       console.error('Failed to add wine pairing:', error)
+      showError('Failed to generate wine pairing. Please try again.')
     } finally {
       setLoadingAction(null)
     }
   }
 
-  const handleRemoveCocktail = async (cocktailId) => {
+  const handleRemoveCocktailClick = (cocktail) => {
+    setConfirmModal({
+      isOpen: true,
+      type: 'cocktail',
+      itemId: cocktail.id,
+      itemName: cocktail.name,
+    })
+  }
+
+  const handleRemoveCocktail = async () => {
     try {
-      await removeCocktail(dinner.id, cocktailId)
+      await removeCocktail(dinner.id, confirmModal.itemId)
     } catch (error) {
       console.error('Failed to remove cocktail:', error)
+    } finally {
+      setConfirmModal({ isOpen: false, type: null, itemId: null, itemName: null })
     }
+  }
+
+  const handleRemoveWineClick = () => {
+    setConfirmModal({
+      isOpen: true,
+      type: 'wine',
+      itemId: null,
+      itemName: wine?.type || 'wine pairing',
+    })
   }
 
   const handleRemoveWine = async () => {
@@ -128,6 +173,31 @@ const MealCard = ({ dinner, dayNumber, onRegenerate, onRemove, showActions = tru
       await removeWinePairing(dinner.id)
     } catch (error) {
       console.error('Failed to remove wine:', error)
+    } finally {
+      setConfirmModal({ isOpen: false, type: null, itemId: null, itemName: null })
+    }
+  }
+
+  const handleConfirmRemove = () => {
+    if (confirmModal.type === 'sideDish') {
+      handleRemoveSideDish()
+    } else if (confirmModal.type === 'cocktail') {
+      handleRemoveCocktail()
+    } else if (confirmModal.type === 'wine') {
+      handleRemoveWine()
+    }
+  }
+
+  const getConfirmMessage = () => {
+    switch (confirmModal.type) {
+      case 'sideDish':
+        return `Remove "${confirmModal.itemName}" from this meal?`
+      case 'cocktail':
+        return `Remove "${confirmModal.itemName}" from this meal?`
+      case 'wine':
+        return `Remove ${confirmModal.itemName} from this meal?`
+      default:
+        return 'Are you sure you want to remove this item?'
     }
   }
 
@@ -148,7 +218,7 @@ const MealCard = ({ dinner, dayNumber, onRegenerate, onRemove, showActions = tru
         {/* Main Dish Section - only show if there's a main dish */}
         {mainDish && (
           <div className="mb-4">
-            <div className="flex items-start justify-between">
+            <div className="flex items-center justify-between">
               <div className="flex-1">
                 <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Main</p>
                 <h3 className="text-lg font-bold text-gray-800">{mainDish.name}</h3>
@@ -165,7 +235,7 @@ const MealCard = ({ dinner, dayNumber, onRegenerate, onRemove, showActions = tru
                   </div>
                 )}
               </div>
-              <div className="flex items-center gap-1 ml-3">
+              <div className="flex items-center gap-1">
                 <button
                   onClick={() => setShowMainDetail(true)}
                   className="px-3 py-1.5 text-sm font-medium text-primary-600 hover:bg-primary-50 rounded-lg transition-colors"
@@ -183,6 +253,8 @@ const MealCard = ({ dinner, dayNumber, onRegenerate, onRemove, showActions = tru
                 >
                   <StarIcon filled={isMainSaved} />
                 </button>
+                {/* Spacer to align with side dishes that have remove button */}
+                {showActions && <div className="w-7" />}
               </div>
             </div>
           </div>
@@ -225,7 +297,7 @@ const MealCard = ({ dinner, dayNumber, onRegenerate, onRemove, showActions = tru
                       </button>
                       {showActions && (
                         <button
-                          onClick={() => handleRemoveSideDish(sideDish.id)}
+                          onClick={() => handleRemoveSideDishClick(sideDish)}
                           className="p-1.5 text-gray-400 hover:text-red-500 transition-colors"
                           title="Remove side dish"
                         >
@@ -311,7 +383,7 @@ const MealCard = ({ dinner, dayNumber, onRegenerate, onRemove, showActions = tru
                       </button>
                       {showActions && (
                         <button
-                          onClick={() => handleRemoveCocktail(cocktail.id)}
+                          onClick={() => handleRemoveCocktailClick(cocktail)}
                           className="p-1.5 text-gray-400 hover:text-red-500 transition-colors"
                           title="Remove cocktail"
                         >
@@ -382,7 +454,7 @@ const MealCard = ({ dinner, dayNumber, onRegenerate, onRemove, showActions = tru
                     <div className="w-7" />
                     {showActions && (
                       <button
-                        onClick={handleRemoveWine}
+                        onClick={handleRemoveWineClick}
                         className="p-1.5 text-gray-400 hover:text-red-500 transition-colors"
                         title="Remove wine"
                       >
@@ -489,6 +561,16 @@ const MealCard = ({ dinner, dayNumber, onRegenerate, onRemove, showActions = tru
           onClose={() => setShowBeverageDetail(null)}
         />
       )}
+
+      <ConfirmationModal
+        isOpen={confirmModal.isOpen}
+        onClose={() => setConfirmModal({ isOpen: false, type: null, itemId: null, itemName: null })}
+        onConfirm={handleConfirmRemove}
+        title="Remove Item"
+        message={getConfirmMessage()}
+        confirmText="Remove"
+        confirmStyle="danger"
+      />
     </>
   )
 }

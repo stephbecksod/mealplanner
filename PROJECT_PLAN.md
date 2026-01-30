@@ -7,7 +7,8 @@ Build a browser-based dinner planning app that generates customized weekly dinne
 - **Frontend**: React with React Router for navigation
 - **Backend**: Node.js with Express for API routes
 - **AI Integration**: Anthropic Claude API for meal/beverage generation
-- **Storage**: Browser localStorage (designed to easily migrate to database later)
+- **Database**: Supabase (PostgreSQL) with Row Level Security
+- **Authentication**: Supabase Auth (email/password)
 - **Styling**: Tailwind CSS for responsive design
 
 ## Project Structure
@@ -135,13 +136,13 @@ meal-planner/
 - ✅ Display meal + side + cocktail + wine together on card
 - ✅ Redesigned meal cards with compact sections
 
-### Phase 5: Smart Optimization & Polish (IN PROGRESS)
+### Phase 5: Smart Optimization & Polish ✅ COMPLETE
 **Goal**: Optimize user experience and prepare for scaling
-- [ ] Ingredient overlap optimization across the week
+- ✅ Ingredient overlap optimization across the week
 - ✅ Improved UI/UX with loading states (add side dish, cocktail, wine buttons)
-- [ ] Error handling and offline support
-- [ ] Prepare architecture for future multi-user support
-- [ ] Add confirmation dialogs for destructive actions
+- ✅ Error handling and offline support
+- ✅ Prepare architecture for future multi-user support (see MULTI_USER_MIGRATION.md)
+- ✅ Add confirmation dialogs for destructive actions
 - ✅ Ability to add a dinner from favorite recipes
 - ✅ Add side dishes and cocktails from favorites to specific days
 - ✅ A la carte items (standalone sides/cocktails at end of meal plan)
@@ -151,13 +152,28 @@ meal-planner/
 - ✅ Multiple side dishes per meal support
 - ✅ Multiple cocktails per meal support
 
+### Phase 6: Multi-User & Cloud Sync ✅ COMPLETE
+**Goal**: Enable user accounts and cross-device data synchronization
+- ✅ Supabase project setup with PostgreSQL database
+- ✅ Database schema with RLS policies (meal_plans, dinners, saved_recipes, saved_cocktails, saved_side_dishes, grocery_lists)
+- ✅ User authentication (sign up, sign in, sign out, password reset)
+- ✅ Protected routes requiring authentication
+- ✅ Data service layer for Supabase operations (supabaseData.js)
+- ✅ MealPlanContext updated to fetch/save data from Supabase
+- ✅ FavoritesContext updated with optimistic updates and Supabase persistence
+- ✅ Automatic localStorage to Supabase migration for existing users
+- ✅ DataMigrationModal component for guided migration experience
+- ✅ Cross-device data synchronization
+
 ## Key Technical Decisions
-- **Single-user mode initially**, but data structure designed for future user accounts
-- **localStorage keys structured** to easily migrate to database
-- **API designed RESTfully** to support future cloud deployment
+- **Multi-user with Supabase** - PostgreSQL database with Row Level Security
+- **Supabase Auth** for user authentication (email/password)
+- **API designed RESTfully** to support cloud deployment
 - **Component architecture** allows easy addition of features
 - **React Context** for state management (can upgrade to Redux if needed)
-- **Data migration** handled automatically for old meal plan formats
+- **Data migration** from localStorage to Supabase handled via migration modal
+- **Optimistic updates** for favorites (immediate UI feedback, rollback on error)
+- **Server-first updates** for meal plans (wait for confirmation on AI-generated data)
 
 ## Data Models
 
@@ -310,8 +326,20 @@ meal-planner/
   - Body: { meals, includeCocktails }
   - Returns: Categorized grocery list (includes mainDish, sideDish, and optionally cocktail ingredients)
 
-## localStorage Structure
+## Supabase Database Schema
 
+```sql
+-- Core tables (all with Row Level Security)
+meal_plans (id, user_id, dietary_preferences, cuisine_preferences, is_active, created_at)
+dinners (id, meal_plan_id, day_of_week, servings, is_a_la_carte, main_dish, side_dishes, beverage_pairing)
+saved_recipes (id, user_id, recipe_data, created_at)
+saved_cocktails (id, user_id, cocktail_data, created_at)
+saved_side_dishes (id, user_id, side_dish_data, created_at)
+grocery_lists (id, meal_plan_id, items, manual_items, checked_items, include_beverages)
+user_preferences (id, user_id, default_servings, default_dietary_preferences, default_cuisine_preferences)
+```
+
+### Legacy localStorage Keys (for migration only)
 ```javascript
 {
   'meal-planner:currentMealPlan': MealPlan,
@@ -319,17 +347,73 @@ meal-planner/
   'meal-planner:savedSideDishes': [SideDish],
   'meal-planner:savedCocktails': [Cocktail],
   'meal-planner:groceryList': GroceryList,
-  'meal-planner:userPreferences': {
-    defaultServings: number,
-    dietaryRestrictions: [string],
-    favoriteCuisines: [string]
-  }
+  'meal-planner:migrated': boolean  // Flag to prevent re-prompting migration
 }
 ```
 
 ## Recent Changes (Latest Session)
 
+### Phase 6: Multi-User & Cloud Sync
+1. **Supabase Integration**:
+   - Set up Supabase project with PostgreSQL database
+   - Created database schema with tables for meal_plans, dinners, saved_recipes, saved_cocktails, saved_side_dishes, grocery_lists
+   - Implemented Row Level Security (RLS) policies for user data isolation
+
+2. **Authentication**:
+   - Added Supabase Auth with email/password sign up/sign in
+   - Created Login and Register pages
+   - Added ProtectedRoute component for authenticated routes
+   - AuthContext manages user session state
+
+3. **Data Layer Migration**:
+   - Created supabaseData.js with mealPlanService and favoritesService
+   - Updated MealPlanContext to use Supabase instead of localStorage
+   - Updated FavoritesContext with optimistic updates and Supabase persistence
+   - All CRUD operations now persist to cloud database
+
+4. **Migration Experience**:
+   - DataMigrationModal detects existing localStorage data
+   - Prompts users to migrate data to their account on first login
+   - Shows migration progress and results
+   - Option to clear localStorage after successful migration
+
+---
+
+## Previous Sessions
+
 ### Completed in This Session:
+
+1. **Confirmation Dialogs**:
+   - Created reusable `ConfirmationModal` component
+   - Added confirmations for removing side dishes, cocktails, wine from MealCard
+   - Replaced browser `confirm()` with modal in Favorites page
+   - Consistent red "danger" styling for remove actions
+
+2. **Error Handling & Offline Support**:
+   - Created `Toast` component for transient error notifications
+   - Added `OfflineBanner` component that detects network status
+   - Enhanced API service with error classification (network, timeout, server, validation)
+   - Added 60-second timeout for AI operations
+   - Toast errors shown for failed operations in MealCard and MealPlan
+   - Automatic "Back online" notification when connection restored
+
+3. **Ingredient Overlap Optimization**:
+   - Enhanced AI prompt for initial meal generation with explicit ingredient overlap strategy
+   - Target 40-60% ingredient overlap across weekly meals
+   - Prioritizes sharing proteins, produce, and pantry staples
+   - New regenerate meal endpoint considers existing meal ingredients
+   - When regenerating a meal, passes existing meals' ingredients to AI for 30-50% overlap
+
+4. **Multi-User Architecture Documentation**:
+   - Created MULTI_USER_MIGRATION.md with complete migration guide
+   - PostgreSQL database schema for users, meal plans, favorites
+   - JWT authentication strategy with refresh tokens
+   - List of files to create and modify
+   - API endpoints to add
+   - Phased implementation plan (6-7 weeks)
+   - Security checklist
+
+### Earlier Session (Add to Week & A La Carte):
 1. **Meal Plan Page Improvements**:
    - Day labels now show "Day 1", "Day 2" instead of weekday names
    - "Add Meal" button opens modal with two options:
@@ -368,13 +452,10 @@ meal-planner/
 6. **Bug Fixes**:
    - Fixed beverage toggle in grocery list (now supports both old and new data formats)
 
-### Remaining Phase 5 Tasks:
-- [ ] Ingredient overlap optimization across the week
-- [ ] Error handling and offline support
-- [ ] Prepare architecture for future multi-user support
-- [ ] Add confirmation dialogs for destructive actions
+### Phase 5 Complete!
+All Phase 5 tasks have been completed. See MULTI_USER_MIGRATION.md for the multi-user architecture documentation.
 
-### Previous Session:
+### Phase 4 Session (Side Dishes & Beverages):
 - Side Dish Feature with AI generation
 - Beverage Pairing (separate cocktail/wine)
 - Meal Card redesign with compact sections
@@ -384,11 +465,8 @@ meal-planner/
 - Star toggle for favorites
 
 ## Future Enhancements (Post-MVP)
-- User authentication and accounts
-- Cloud synchronization
-- Meal planning calendar view
-- Nutritional information display
-- Cooking mode with step-by-step timers
+- ✅ User authentication and accounts (Supabase Auth)
+- ✅ Cloud synchronization (Supabase PostgreSQL)
 - Share meal plans with others
 - Integration with grocery delivery services
 - Recipe import from URLs

@@ -32,13 +32,14 @@ router.post('/generate', async (req, res) => {
 
 router.post('/regenerate', async (req, res) => {
   try {
-    const { dietaryPreferences, cuisinePreferences, servings, includeSides } = req.body
+    const { dietaryPreferences, cuisinePreferences, servings, includeSides, existingMeals } = req.body
 
     const recipe = await claudeService.regenerateRecipe({
       dietaryPreferences: dietaryPreferences || [],
       cuisinePreferences: cuisinePreferences || [],
       servings: servings || 4,
       includeSides: includeSides || false,
+      existingMeals: existingMeals || [],
     })
 
     res.json(recipe)
