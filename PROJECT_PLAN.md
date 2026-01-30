@@ -165,6 +165,15 @@ meal-planner/
 - ✅ DataMigrationModal component for guided migration experience
 - ✅ Cross-device data synchronization
 
+### Phase 7: Production Deployment 🚧 IN PROGRESS
+**Goal**: Make the app publicly accessible
+- ✅ Database migration deployed to Supabase
+- ✅ Edge Functions deployed to Supabase (generate-meals, regenerate-meal, add-side-dish, add-beverage, generate-grocery)
+- ✅ ANTHROPIC_API_KEY secret configured in Supabase
+- ⏳ Deploy frontend to Vercel/Netlify
+- ⏳ Configure production URL in Supabase Auth settings
+- ⏳ Test production deployment end-to-end
+
 ## Key Technical Decisions
 - **Multi-user with Supabase** - PostgreSQL database with Row Level Security
 - **Supabase Auth** for user authentication (email/password)
