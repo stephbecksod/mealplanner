@@ -9,16 +9,20 @@ interface GenerateMealsRequest {
   numberOfMeals: number
   dietaryPreferences?: string[]
   cuisinePreferences?: string[]
+  proteinPreferences?: string[]
   servings?: number
   includeSides?: boolean
+  prioritizeOverlap?: boolean
 }
 
 function buildRecipePrompt({
   numberOfMeals,
   dietaryPreferences,
   cuisinePreferences,
+  proteinPreferences,
   servings,
   includeSides,
+  prioritizeOverlap,
 }: GenerateMealsRequest): string {
   let prompt = `Generate ${numberOfMeals} dinner recipe${numberOfMeals > 1 ? 's' : ''} with the following requirements:\n\n`
 
@@ -30,9 +34,19 @@ function buildRecipePrompt({
     prompt += `Cuisine Preferences: ${cuisinePreferences.join(', ')}\n`
   }
 
+  if (proteinPreferences && proteinPreferences.length > 0) {
+    prompt += `Protein Preferences: ${proteinPreferences.join(', ')}\n`
+    prompt += `IMPORTANT - Protein Distribution Rules:
+- Each meal should feature ONE of the selected proteins as its main protein
+- If the number of proteins matches the number of meals, use each protein exactly once
+- If more proteins are selected than meals, choose the best subset (one protein per meal)
+- If fewer proteins are selected than meals, you may repeat proteins across meals
+- Only combine multiple proteins in a single dish if it genuinely makes sense (e.g., surf and turf, paella) - do NOT force combinations just to use more proteins\n\n`
+  }
+
   prompt += `Servings: ${servings || 4} people\n\n`
 
-  if (numberOfMeals > 1) {
+  if (prioritizeOverlap !== false && numberOfMeals > 1) {
     prompt += `IMPORTANT - Ingredient Overlap Strategy:
 - Design recipes that share common ingredients to minimize grocery shopping complexity
 - Aim for 40-60% ingredient overlap across the week's meals
@@ -139,8 +153,10 @@ serve(async (req) => {
       numberOfMeals = 3,
       dietaryPreferences = [],
       cuisinePreferences = [],
+      proteinPreferences = [],
       servings = 4,
       includeSides = false,
+      prioritizeOverlap = true,
     }: GenerateMealsRequest = await req.json()
 
     // Validate input
@@ -156,8 +172,10 @@ serve(async (req) => {
       numberOfMeals,
       dietaryPreferences,
       cuisinePreferences,
+      proteinPreferences,
       servings,
       includeSides,
+      prioritizeOverlap,
     })
 
     const response = await generateCompletion(prompt)

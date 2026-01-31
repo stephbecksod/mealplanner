@@ -25,6 +25,17 @@ const CUISINE_OPTIONS = [
   'Korean',
 ]
 
+const PROTEIN_OPTIONS = [
+  'Chicken',
+  'Beef',
+  'Pork',
+  'Fish/Seafood',
+  'Tofu/Tempeh',
+  'Lamb',
+  'Turkey',
+  'Shrimp',
+]
+
 const Home = () => {
   const navigate = useNavigate()
   const { generateMealPlan, loading, error } = useMealPlan()
@@ -33,9 +44,11 @@ const Home = () => {
   const [servings, setServings] = useState(4)
   const [selectedDietary, setSelectedDietary] = useState([])
   const [selectedCuisines, setSelectedCuisines] = useState([])
+  const [selectedProteins, setSelectedProteins] = useState([])
   const [includeSides, setIncludeSides] = useState(false)
   const [includeCocktails, setIncludeCocktails] = useState(false)
   const [includeWine, setIncludeWine] = useState(false)
+  const [prioritizeOverlap, setPrioritizeOverlap] = useState(true)
 
   const toggleDietary = (option) => {
     setSelectedDietary(prev =>
@@ -53,16 +66,26 @@ const Home = () => {
     )
   }
 
+  const toggleProtein = (option) => {
+    setSelectedProteins(prev =>
+      prev.includes(option)
+        ? prev.filter(item => item !== option)
+        : [...prev, option]
+    )
+  }
+
   const handleGenerate = async () => {
     try {
       await generateMealPlan({
         numberOfMeals,
         dietaryPreferences: selectedDietary,
         cuisinePreferences: selectedCuisines,
+        proteinPreferences: selectedProteins,
         servings,
         includeSides,
         includeCocktails,
         includeWine,
+        prioritizeOverlap,
       })
       navigate('/meal-plan')
     } catch (err) {
@@ -159,6 +182,27 @@ const Home = () => {
           </div>
         </div>
 
+        <div>
+          <label className="block text-sm font-semibold text-gray-700 mb-3">
+            Protein Preferences (optional)
+          </label>
+          <div className="flex flex-wrap gap-2">
+            {PROTEIN_OPTIONS.map(option => (
+              <button
+                key={option}
+                onClick={() => toggleProtein(option)}
+                className={`px-4 py-2 rounded-full font-medium transition-all ${
+                  selectedProteins.includes(option)
+                    ? 'bg-primary-600 text-white'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                }`}
+              >
+                {option}
+              </button>
+            ))}
+          </div>
+        </div>
+
         <div className="space-y-3">
           <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
             <div>
@@ -224,6 +268,29 @@ const Home = () => {
               <span
                 className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
                   includeWine ? 'translate-x-6' : 'translate-x-1'
+                }`}
+              />
+            </button>
+          </div>
+
+          <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+            <div>
+              <label className="text-sm font-semibold text-gray-700">
+                Prioritize Ingredient Overlap
+              </label>
+              <p className="text-xs text-gray-500 mt-1">
+                Design meals to share ingredients and simplify shopping
+              </p>
+            </div>
+            <button
+              onClick={() => setPrioritizeOverlap(!prioritizeOverlap)}
+              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                prioritizeOverlap ? 'bg-primary-600' : 'bg-gray-300'
+              }`}
+            >
+              <span
+                className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                  prioritizeOverlap ? 'translate-x-6' : 'translate-x-1'
                 }`}
               />
             </button>

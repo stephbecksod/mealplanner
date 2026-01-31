@@ -4,7 +4,7 @@ const claudeService = require('../services/claudeService')
 
 router.post('/generate', async (req, res) => {
   try {
-    const { numberOfMeals, dietaryPreferences, cuisinePreferences, servings, includeSides } = req.body
+    const { numberOfMeals, dietaryPreferences, cuisinePreferences, proteinPreferences, servings, includeSides, prioritizeOverlap } = req.body
 
     if (!numberOfMeals || numberOfMeals < 1 || numberOfMeals > 5) {
       return res.status(400).json({
@@ -16,8 +16,10 @@ router.post('/generate', async (req, res) => {
       numberOfMeals,
       dietaryPreferences: dietaryPreferences || [],
       cuisinePreferences: cuisinePreferences || [],
+      proteinPreferences: proteinPreferences || [],
       servings: servings || 4,
       includeSides: includeSides || false,
+      prioritizeOverlap: prioritizeOverlap !== false,
     })
 
     res.json(recipes)
@@ -32,14 +34,16 @@ router.post('/generate', async (req, res) => {
 
 router.post('/regenerate', async (req, res) => {
   try {
-    const { dietaryPreferences, cuisinePreferences, servings, includeSides, existingMeals } = req.body
+    const { dietaryPreferences, cuisinePreferences, proteinPreferences, servings, includeSides, existingMeals, prioritizeOverlap } = req.body
 
     const recipe = await claudeService.regenerateRecipe({
       dietaryPreferences: dietaryPreferences || [],
       cuisinePreferences: cuisinePreferences || [],
+      proteinPreferences: proteinPreferences || [],
       servings: servings || 4,
       includeSides: includeSides || false,
       existingMeals: existingMeals || [],
+      prioritizeOverlap: prioritizeOverlap !== false,
     })
 
     res.json(recipe)

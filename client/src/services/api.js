@@ -121,31 +121,35 @@ const fetchWithAuth = async (endpoint, options = {}) => {
 }
 
 export const mealsAPI = {
-  generateMeals: async ({ numberOfMeals, dietaryPreferences, cuisinePreferences, servings, includeSides }) => {
+  generateMeals: async ({ numberOfMeals, dietaryPreferences, cuisinePreferences, proteinPreferences, servings, includeSides, prioritizeOverlap }) => {
     const response = await fetchWithAuth('/generate-meals', {
       method: 'POST',
       body: JSON.stringify({
         numberOfMeals,
         dietaryPreferences,
         cuisinePreferences,
+        proteinPreferences,
         servings,
         includeSides,
+        prioritizeOverlap,
       }),
     })
     // Edge Function returns { recipes: [...] }, extract the array
     return response.recipes
   },
 
-  regenerateMeal: async ({ mealId, dietaryPreferences, cuisinePreferences, servings, includeSides, existingMeals }) => {
+  regenerateMeal: async ({ mealId, dietaryPreferences, cuisinePreferences, proteinPreferences, servings, includeSides, existingMeals, prioritizeOverlap }) => {
     const response = await fetchWithAuth('/regenerate-meal', {
       method: 'POST',
       body: JSON.stringify({
         mealId,
         dietaryPreferences,
         cuisinePreferences,
+        proteinPreferences,
         servings,
         includeSides,
         existingMeals,
+        prioritizeOverlap,
       }),
     })
     // Edge Function returns { recipe: {...} }, extract the recipe

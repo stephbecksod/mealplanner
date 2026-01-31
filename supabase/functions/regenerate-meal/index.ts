@@ -13,17 +13,21 @@ interface ExistingMeal {
 interface RegenerateMealRequest {
   dietaryPreferences?: string[]
   cuisinePreferences?: string[]
+  proteinPreferences?: string[]
   servings?: number
   includeSides?: boolean
   existingMeals?: ExistingMeal[]
+  prioritizeOverlap?: boolean
 }
 
 function buildRegeneratePrompt({
   dietaryPreferences,
   cuisinePreferences,
+  proteinPreferences,
   servings,
   includeSides,
   existingMeals,
+  prioritizeOverlap,
 }: RegenerateMealRequest): string {
   let prompt = `Generate 1 new dinner recipe with the following requirements:\n\n`
 
@@ -35,10 +39,15 @@ function buildRegeneratePrompt({
     prompt += `Cuisine Preferences: ${cuisinePreferences.join(', ')}\n`
   }
 
+  if (proteinPreferences && proteinPreferences.length > 0) {
+    prompt += `Protein Preferences: ${proteinPreferences.join(', ')}\n`
+    prompt += `Use ONE of these proteins as the main protein source for this meal. Only combine multiple proteins if it genuinely makes sense for the dish (e.g., surf and turf).\n\n`
+  }
+
   prompt += `Servings: ${servings || 4} people\n\n`
 
   // Add existing meals context for ingredient overlap
-  if (existingMeals && existingMeals.length > 0) {
+  if (prioritizeOverlap !== false && existingMeals && existingMeals.length > 0) {
     prompt += `IMPORTANT - Ingredient Overlap Optimization:
 This recipe will be part of a weekly meal plan. Here are the other meals already in the plan:
 
@@ -152,18 +161,22 @@ serve(async (req) => {
     const {
       dietaryPreferences = [],
       cuisinePreferences = [],
+      proteinPreferences = [],
       servings = 4,
       includeSides = false,
       existingMeals = [],
+      prioritizeOverlap = true,
     }: RegenerateMealRequest = await req.json()
 
     // Build prompt and call Claude
     const prompt = buildRegeneratePrompt({
       dietaryPreferences,
       cuisinePreferences,
+      proteinPreferences,
       servings,
       includeSides,
       existingMeals,
+      prioritizeOverlap,
     })
 
     const response = await generateCompletion(prompt)

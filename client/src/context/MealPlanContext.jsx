@@ -54,7 +54,7 @@ export const MealPlanProvider = ({ children }) => {
     fetchMealPlan()
   }, [fetchMealPlan, user?.id])
 
-  const generateMealPlan = async ({ numberOfMeals, dietaryPreferences, cuisinePreferences, servings, includeSides = false, includeCocktails = false, includeWine = false }) => {
+  const generateMealPlan = async ({ numberOfMeals, dietaryPreferences, cuisinePreferences, proteinPreferences, servings, includeSides = false, includeCocktails = false, includeWine = false, prioritizeOverlap = true }) => {
     setLoading(true)
     setError(null)
 
@@ -63,8 +63,10 @@ export const MealPlanProvider = ({ children }) => {
         numberOfMeals,
         dietaryPreferences,
         cuisinePreferences,
+        proteinPreferences,
         servings,
         includeSides,
+        prioritizeOverlap,
       })
 
       const dinners = meals.map((meal, index) => {
@@ -111,6 +113,8 @@ export const MealPlanProvider = ({ children }) => {
         createdAt: Date.now(),
         dietaryPreferences: dietaryPreferences || [],
         cuisinePreferences: cuisinePreferences || [],
+        proteinPreferences: proteinPreferences || [],
+        prioritizeOverlap: prioritizeOverlap !== false,
         dinners,
       }
 
@@ -151,9 +155,11 @@ export const MealPlanProvider = ({ children }) => {
         mealId,
         dietaryPreferences,
         cuisinePreferences,
+        proteinPreferences: mealPlan.proteinPreferences || [],
         servings,
         includeSides: includeSides || hasSides,
         existingMeals,
+        prioritizeOverlap: mealPlan.prioritizeOverlap !== false,
       })
 
       const { sideDish, ...mainDish } = newRecipe
@@ -222,8 +228,10 @@ export const MealPlanProvider = ({ children }) => {
         numberOfMeals: 1,
         dietaryPreferences: mealPlan?.dietaryPreferences || [],
         cuisinePreferences: mealPlan?.cuisinePreferences || [],
+        proteinPreferences: mealPlan?.proteinPreferences || [],
         servings,
         includeSides: false,
+        prioritizeOverlap: mealPlan?.prioritizeOverlap !== false,
       })
 
       const meal = meals[0]
