@@ -480,9 +480,29 @@ All Phase 5 tasks have been completed. See MULTI_USER_MIGRATION.md for the multi
 - Star toggle for favorites
 
 ## Future Enhancements (Post-MVP)
+
+### Completed
 - ✅ User authentication and accounts (Supabase Auth)
 - ✅ Cloud synchronization (Supabase PostgreSQL)
+
+### Recipe Customization & AI Chat
+- **Ingredient Swap** - Swap out ingredients in a recipe (e.g., make this with beef instead of chicken) or remove an ingredient entirely
+- **Recipe Chat** - Chat with AI to update a recipe (e.g., "Can you make this recipe dairy free?" or "Make it spicier")
+- **Custom Add Meal** - Manually add a custom meal on the "This Week" tab (user-created, not AI-generated)
+
+### Generation Preferences
+- **Ingredient Overlap Control** - Slider or setting to indicate desired level of ingredient overlap (low/medium/high) when generating weekly meals
+- **Protein Selection** - Select specific proteins for the week before generation (e.g., "I want salmon, chicken, and beef this week")
+- **Pantry Inventory** - Add ingredients you already have at home so recipe generation prioritizes using what you have
+
+### Recipe Import
+- **Import from URL** - Load recipes from online sources by pasting a URL (extract recipe data from popular recipe sites)
+- **Import from Image** - Upload a photo of a cookbook page or screenshot to import a recipe (OCR + AI parsing)
+
+### Sharing & Social
 - Share meal plans with others
-- Integration with grocery delivery services
-- Recipe import from URLs
-- Custom recipe creation
+- Collaborative meal planning for households
+
+### Integrations
+- Integration with grocery delivery services (Instacart, Amazon Fresh, etc.)
+- Calendar integration for meal scheduling
