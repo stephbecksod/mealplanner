@@ -220,20 +220,28 @@ meal-planner/
 - ✅ All screens created and working:
   - LoginScreen - email/password authentication
   - HomeScreen - meal generation with all options (dietary, cuisine, protein, toggles)
-  - MealPlanScreen - view/regenerate/remove meals
-  - GroceryScreen - categorized shopping checklist
-  - FavoritesScreen - tabs for recipes, cocktails, and side dishes
+  - MealPlanScreen - view/regenerate/remove meals with enhanced MealCard
+  - GroceryScreen - categorized shopping checklist with beverage toggle
+  - FavoritesScreen - tabs for recipes, sides, cocktails with add-to-plan
   - ProfileScreen - user info and sign out
 - ✅ 5-tab navigation: Generate, This Week, Grocery, Favorites, Profile
 - ✅ Fixed render errors (Expo Go cache issue - clear cache to resolve)
 - ✅ Fixed `gap` CSS property issues (replaced with margin-based spacing)
 - ✅ Fixed react-native-screens version compatibility
+- ✅ Detail modals for recipes, side dishes, and cocktails
+- ✅ Enhanced MealCard with star/favorite buttons and view actions
+- ✅ Add/remove side dishes and cocktails on meals
+- ✅ Add/remove wine pairings on meals
+- ✅ Beverage ingredients toggle on grocery list
+- ✅ Add to Week from Favorites (recipes add directly, sides/cocktails show day picker + a la carte)
+- ✅ "Included in Week" state for items already in meal plan
+- ✅ Day numbering format ("Day 1", "Day 2" instead of weekday names)
+- ✅ "Add Another Meal" button (generates directly, no day picker)
+- ✅ Fixed Supabase upsert for grocery lists (removed ON CONFLICT)
+- ✅ Fixed cocktail ingredients in grocery list (Edge Function update)
 
 **Remaining:**
-- ⏳ Test meal plan generation end-to-end
-- ⏳ Add favorite toggle (star icon) on MealPlanScreen meal cards
 - ⏳ Add CustomMealForm for mobile
-- ⏳ Add "Add to Week" from Favorites
 - ⏳ Build production APK/IPA for app stores
 
 **Mobile App Structure**:
@@ -242,10 +250,15 @@ mobile/
 ├── App.js                    # Navigation setup with 5 tabs
 ├── app.json                  # Expo config
 ├── .env                      # Supabase credentials (not committed)
+├── MOBILE_DEV.md             # Mobile development guide
 └── src/
+    ├── components/
+    │   ├── RecipeDetailModal.js      # Full recipe view modal
+    │   ├── SideDishDetailModal.js    # Side dish recipe modal
+    │   └── BeverageDetailModal.js    # Cocktail/wine detail modal
     ├── context/
     │   ├── AuthContext.js
-    │   ├── MealPlanContext.js
+    │   ├── MealPlanContext.js        # Includes add/remove side/cocktail/wine
     │   └── FavoritesContext.js
     ├── services/
     │   ├── supabase.js       # SecureStore adapter
@@ -254,18 +267,29 @@ mobile/
     └── screens/
         ├── LoginScreen.js
         ├── HomeScreen.js
-        ├── MealPlanScreen.js
-        ├── GroceryScreen.js
-        ├── FavoritesScreen.js
+        ├── MealPlanScreen.js         # Enhanced with detail modals & actions
+        ├── GroceryScreen.js          # With beverage toggle
+        ├── FavoritesScreen.js        # With add-to-plan & day picker
         └── ProfileScreen.js
 ```
 
 **How to Run Mobile App**:
 1. Navigate to mobile directory: `cd mobile`
-2. Start Expo with tunnel: `npx expo start --tunnel`
-3. Scan QR code with Expo Go app (or use generated URL)
-4. If you get render errors, clear Expo Go cache: Settings > Apps > Expo Go > Clear Cache
-6. Build and submit to app stores
+2. Start Expo with tunnel: `npx expo start --tunnel --port 19000`
+3. Wait for "Tunnel ready" message
+4. Get the Expo Go URL: `curl -s http://localhost:19000 | grep -o '"hostUri":"[^"]*"'`
+5. Generate QR code: `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=exp://YOUR-TUNNEL-URL`
+6. Scan QR code with Expo Go app, or enter URL manually in app
+7. If you get render errors, clear Expo Go cache: Settings > Apps > Expo Go > Clear Cache
+
+**Quick Expo Go URL (for tomorrow)**:
+After running `npx expo start --tunnel --port 19000`, the tunnel URL format is:
+`exp://[random-id]-anonymous-19000.exp.direct`
+
+To get a scannable QR code, use:
+```
+https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=exp://YOUR-TUNNEL-URL-HERE
+```
 
 ## Key Technical Decisions
 - **Multi-user with Supabase** - PostgreSQL database with Row Level Security
@@ -455,7 +479,48 @@ user_preferences (id, user_id, default_servings, default_dietary_preferences, de
 
 ## Recent Changes (Latest Session)
 
-### Phase 9: Mobile App Development - FUNCTIONAL
+### Mobile App Feature Parity (Complete)
+Brought the React Native mobile app to full feature parity with the web app.
+
+1. **Detail Modals** (new components):
+   - `RecipeDetailModal.js` - Full recipe view with ingredients, instructions, dietary badges
+   - `SideDishDetailModal.js` - Side dish recipe with pairing reason
+   - `BeverageDetailModal.js` - Cocktail/wine details with flavor profile
+
+2. **Enhanced MealCard** (MealPlanScreen.js):
+   - Star/favorite buttons for recipes, sides, and cocktails
+   - View buttons opening detail modals
+   - Add Side Dish, Add Cocktail, Add Wine buttons
+   - Remove buttons for all components with confirmation
+   - Day labels as "Day 1", "Day 2" (not weekday names)
+
+3. **MealPlanContext Enhancements**:
+   - `addSideDishToMeal()` - Add saved side dish to specific meal
+   - `addAlaCarteSideDish()` - Add standalone side dish
+   - `addCocktailToMeal()` - Add saved cocktail to specific meal
+   - `addAlaCarteCocktail()` - Add standalone cocktail
+   - `refreshGroceryList(includeBeverages)` - Refresh with beverage toggle
+
+4. **Favorites Screen Overhaul**:
+   - Tab order: Recipes, Sides, Cocktails (was Recipes, Cocktails, Sides)
+   - Recipes: "Add to Week" adds directly as next day
+   - Sides/Cocktails: Day picker modal with existing days + A La Carte option
+   - "Included in Week" disabled state for items already in plan
+   - Loading spinners during add operations
+
+5. **Grocery Screen**:
+   - Added beverage ingredients toggle (purple switch)
+   - Detects cocktails/wines in meal plan to show toggle
+   - Refreshes grocery list when toggle changes
+
+6. **Bug Fixes**:
+   - Fixed Supabase upsert error ("no unique constraint") - changed to check-then-update/insert
+   - Fixed cocktail ingredients not appearing in grocery list:
+     - Edge Function now looks in `beveragePairing.cocktail` (not `meal.cocktails`)
+     - Accepts both `includeCocktails` and `includeBeverages` parameters
+   - Fixed column name mismatches with database schema
+
+### Previous Session: Mobile App Initial Build
 1. **React Native / Expo Setup**:
    - Initialized Expo project in `mobile/` directory
    - Linked to Expo account (stephsod3/nom-nom-plan)
@@ -478,13 +543,6 @@ user_preferences (id, user_id, default_servings, default_dietary_preferences, de
    - Fixed "tried to register two views with the same name RNCSafeAreaProvider" - cleared Expo Go cache
    - Fixed "expected dynamic type 'boolean'" error - removed `gap` CSS properties
    - Fixed react-native-screens version mismatch - downgraded to ~4.16.0
-
-5. **Mobile App Status**:
-   - ✅ App runs in Expo Go
-   - ✅ Authentication works (login/logout)
-   - ✅ All 5 tabs display correctly
-   - ✅ Favorites tab added with FavoritesContext
-   - ⏳ Need to test meal generation and full workflow
 
 ### Phase 8: Advanced Generation Features (Complete)
 1. **Protein Selection**:
