@@ -1,8 +1,32 @@
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet } from 'react-native'
+import { useState, useEffect } from 'react'
+import { View, Text, ScrollView, TouchableOpacity, Switch, StyleSheet } from 'react-native'
 import { useMealPlan } from '../context/MealPlanContext'
 
 const GroceryScreen = () => {
-  const { groceryList, mealPlan, updateGroceryItem } = useMealPlan()
+  const { groceryList, mealPlan, updateGroceryItem, refreshGroceryList } = useMealPlan()
+  const [includeBeverages, setIncludeBeverages] = useState(false)
+  const [checkedWines, setCheckedWines] = useState({})
+
+  // Check if any meals have beverage pairings (support both old and new format)
+  const hasCocktails = mealPlan?.dinners?.some(d => {
+    const cocktails = d.beveragePairing?.cocktails || (d.beveragePairing?.cocktail ? [d.beveragePairing.cocktail] : [])
+    return cocktails.length > 0
+  }) || false
+  const hasWines = mealPlan?.dinners?.some(d => d.beveragePairing?.wine) || false
+  const hasBeverages = hasCocktails || hasWines
+
+  // Get unique wines from meal plan
+  const wines = mealPlan?.dinners
+    ?.filter(d => d.beveragePairing?.wine)
+    ?.map(d => d.beveragePairing.wine.type) || []
+  const uniqueWines = [...new Set(wines)]
+
+  // Refresh grocery list when beverage toggle changes
+  useEffect(() => {
+    if (groceryList && hasCocktails) {
+      refreshGroceryList(includeBeverages)
+    }
+  }, [includeBeverages])
 
   if (!groceryList || !groceryList.items || groceryList.items.length === 0) {
     return (
@@ -23,7 +47,7 @@ const GroceryScreen = () => {
     categories[category].push(item)
   }
 
-  const categoryOrder = ['produce', 'protein', 'dairy', 'pantry', 'spices', 'other']
+  const categoryOrder = ['produce', 'protein', 'dairy', 'pantry', 'spices', 'beverages', 'other']
   const sortedCategories = Object.keys(categories).sort((a, b) => {
     const aIndex = categoryOrder.indexOf(a.toLowerCase())
     const bIndex = categoryOrder.indexOf(b.toLowerCase())
@@ -34,6 +58,10 @@ const GroceryScreen = () => {
 
   const handleToggleItem = (itemId, currentChecked) => {
     updateGroceryItem(itemId, !currentChecked)
+  }
+
+  const handleToggleWine = (wine) => {
+    setCheckedWines(prev => ({ ...prev, [wine]: !prev[wine] }))
   }
 
   const checkedCount = groceryList.items.filter(i => i.checked).length
@@ -49,6 +77,18 @@ const GroceryScreen = () => {
       <View style={styles.progressBar}>
         <View style={[styles.progressFill, { width: `${(checkedCount / totalCount) * 100}%` }]} />
       </View>
+
+      {hasBeverages && (
+        <View style={styles.beverageToggle}>
+          <Text style={styles.beverageToggleText}>Include beverage ingredients</Text>
+          <Switch
+            value={includeBeverages}
+            onValueChange={setIncludeBeverages}
+            trackColor={{ false: '#D1D5DB', true: '#A78BFA' }}
+            thumbColor={includeBeverages ? '#7C3AED' : '#9CA3AF'}
+          />
+        </View>
+      )}
 
       {sortedCategories.map(category => (
         <View key={category} style={styles.categorySection}>
@@ -76,6 +116,31 @@ const GroceryScreen = () => {
           ))}
         </View>
       ))}
+
+      {includeBeverages && hasWines && uniqueWines.length > 0 && (
+        <View style={styles.categorySection}>
+          <Text style={styles.categoryTitle}>Wines</Text>
+          {uniqueWines.map((wine, idx) => (
+            <TouchableOpacity
+              key={idx}
+              style={styles.itemRow}
+              onPress={() => handleToggleWine(wine)}
+            >
+              <View style={[styles.checkbox, checkedWines[wine] && styles.checkboxChecked]}>
+                {checkedWines[wine] && <Text style={styles.checkmark}>✓</Text>}
+              </View>
+              <View style={styles.itemContent}>
+                <Text style={[styles.itemName, checkedWines[wine] && styles.itemChecked]}>
+                  {wine}
+                </Text>
+                <Text style={[styles.itemQuantity, checkedWines[wine] && styles.itemChecked]}>
+                  1 bottle
+                </Text>
+              </View>
+            </TouchableOpacity>
+          ))}
+        </View>
+      )}
 
       {groceryList.manualItems && groceryList.manualItems.length > 0 && (
         <View style={styles.categorySection}>
@@ -130,13 +195,27 @@ const styles = StyleSheet.create({
     height: 8,
     backgroundColor: '#E5E7EB',
     borderRadius: 4,
-    marginBottom: 24,
+    marginBottom: 16,
     overflow: 'hidden',
   },
   progressFill: {
     height: '100%',
     backgroundColor: '#16A34A',
     borderRadius: 4,
+  },
+  beverageToggle: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: '#F3E8FF',
+    padding: 14,
+    borderRadius: 12,
+    marginBottom: 20,
+  },
+  beverageToggleText: {
+    fontSize: 15,
+    fontWeight: '500',
+    color: '#6D28D9',
   },
   emptyContainer: {
     flex: 1,

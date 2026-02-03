@@ -200,29 +200,54 @@ export const MealPlanProvider = ({ children }) => {
     }
   }
 
-  const addMeal = async (recipe, servings) => {
-    const regularMeals = (mealPlan?.dinners || []).filter(d => !d.isAlaCarte)
-    const alaCarte = (mealPlan?.dinners || []).filter(d => d.isAlaCarte)
+  const addMeal = async (dinnerOrRecipe, servings) => {
+    setLoading(true)
+    setError(null)
 
-    const newDinnerData = {
-      dayOfWeek: `Day ${regularMeals.length + 1}`,
-      mainDish: recipe,
-      sideDishes: [],
-      servings: servings || 4,
-      beveragePairing: null,
-      isAlaCarte: false,
+    try {
+      const regularMeals = (mealPlan?.dinners || []).filter(d => !d.isAlaCarte)
+      const alaCarte = (mealPlan?.dinners || []).filter(d => d.isAlaCarte)
+
+      // Support both full dinner object and (recipe, servings) signature
+      let newDinnerData
+      if (dinnerOrRecipe.mainDish !== undefined) {
+        // Full dinner object passed
+        newDinnerData = {
+          dayOfWeek: dinnerOrRecipe.dayOfWeek || `Day ${regularMeals.length + 1}`,
+          mainDish: dinnerOrRecipe.mainDish,
+          sideDishes: dinnerOrRecipe.sideDishes || [],
+          servings: dinnerOrRecipe.servings || 4,
+          beveragePairing: dinnerOrRecipe.beveragePairing || null,
+          isAlaCarte: dinnerOrRecipe.isAlaCarte || false,
+        }
+      } else {
+        // Recipe object passed (legacy signature)
+        newDinnerData = {
+          dayOfWeek: `Day ${regularMeals.length + 1}`,
+          mainDish: dinnerOrRecipe,
+          sideDishes: [],
+          servings: servings || 4,
+          beveragePairing: null,
+          isAlaCarte: false,
+        }
+      }
+
+      const newDinner = await mealPlanService.addDinner(mealPlan.id, newDinnerData)
+
+      const updatedDinners = [...regularMeals, newDinner, ...alaCarte]
+      const updatedMealPlan = { ...mealPlan, dinners: updatedDinners }
+
+      setMealPlan(updatedMealPlan)
+
+      const newGroceryList = await groceryAPI.generateList({ meals: updatedDinners })
+      await mealPlanService.upsertGroceryList(mealPlan.id, newGroceryList)
+      setGroceryList(newGroceryList)
+    } catch (err) {
+      setError(err.message || 'Failed to add meal')
+      throw err
+    } finally {
+      setLoading(false)
     }
-
-    const newDinner = await mealPlanService.addDinner(mealPlan.id, newDinnerData)
-
-    const updatedDinners = [...regularMeals, newDinner, ...alaCarte]
-    const updatedMealPlan = { ...mealPlan, dinners: updatedDinners }
-
-    setMealPlan(updatedMealPlan)
-
-    const newGroceryList = await groceryAPI.generateList({ meals: updatedDinners })
-    await mealPlanService.upsertGroceryList(mealPlan.id, newGroceryList)
-    setGroceryList(newGroceryList)
   }
 
   const removeMeal = async (mealId) => {
@@ -250,6 +275,300 @@ export const MealPlanProvider = ({ children }) => {
     setGroceryList(null)
   }
 
+  const addSideDish = async (dinnerId) => {
+    setLoading(true)
+    setError(null)
+
+    try {
+      const dinner = mealPlan.dinners.find(d => d.id === dinnerId)
+      if (!dinner || !dinner.mainDish) {
+        throw new Error('Dinner not found or has no main dish')
+      }
+
+      const existingSideDishes = (dinner.sideDishes || []).map(s => s.name)
+      const sideDish = await mealsAPI.addSideDish({
+        mainDish: dinner.mainDish,
+        dietaryPreferences: mealPlan.dietaryPreferences || [],
+        servings: dinner.servings || 4,
+        existingSideDishes,
+      })
+
+      const updatedSideDishes = [...(dinner.sideDishes || []), { ...sideDish, id: `side-${Date.now()}` }]
+
+      await mealPlanService.updateDinner(dinnerId, { sideDishes: updatedSideDishes })
+
+      const updatedDinners = mealPlan.dinners.map(d =>
+        d.id === dinnerId ? { ...d, sideDishes: updatedSideDishes } : d
+      )
+      setMealPlan({ ...mealPlan, dinners: updatedDinners })
+
+      // Update grocery list (non-blocking - don't fail if this errors)
+      try {
+        const newGroceryList = await groceryAPI.generateList({ meals: updatedDinners })
+        await mealPlanService.upsertGroceryList(mealPlan.id, newGroceryList)
+        setGroceryList(newGroceryList)
+      } catch (groceryErr) {
+        console.warn('Failed to update grocery list:', groceryErr)
+      }
+
+      return sideDish
+    } catch (err) {
+      setError(err.message || 'Failed to add side dish')
+      throw err
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const removeSideDish = async (dinnerId, sideDishId) => {
+    setLoading(true)
+    setError(null)
+
+    try {
+      const dinner = mealPlan.dinners.find(d => d.id === dinnerId)
+      if (!dinner) throw new Error('Dinner not found')
+
+      const updatedSideDishes = (dinner.sideDishes || []).filter(s => s.id !== sideDishId)
+
+      await mealPlanService.updateDinner(dinnerId, { sideDishes: updatedSideDishes })
+
+      const updatedDinners = mealPlan.dinners.map(d =>
+        d.id === dinnerId ? { ...d, sideDishes: updatedSideDishes } : d
+      )
+      setMealPlan({ ...mealPlan, dinners: updatedDinners })
+
+      // Update grocery list (non-blocking)
+      try {
+        const newGroceryList = await groceryAPI.generateList({ meals: updatedDinners })
+        await mealPlanService.upsertGroceryList(mealPlan.id, newGroceryList)
+        setGroceryList(newGroceryList)
+      } catch (groceryErr) {
+        console.warn('Failed to update grocery list:', groceryErr)
+      }
+    } catch (err) {
+      setError(err.message || 'Failed to remove side dish')
+      throw err
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const addCocktail = async (dinnerId) => {
+    setLoading(true)
+    setError(null)
+
+    try {
+      const dinner = mealPlan.dinners.find(d => d.id === dinnerId)
+      if (!dinner || !dinner.mainDish) {
+        throw new Error('Dinner not found or has no main dish')
+      }
+
+      const result = await beveragesAPI.regenerateCocktail({
+        recipeName: dinner.mainDish.name,
+        ingredients: dinner.mainDish.ingredients?.map(i => i.item) || [],
+      })
+
+      const cocktail = { ...result.cocktail, id: `cocktail-${Date.now()}` }
+      const existingPairing = dinner.beveragePairing || {}
+      const updatedPairing = { ...existingPairing, cocktail }
+
+      await mealPlanService.updateDinner(dinnerId, { beveragePairing: updatedPairing })
+
+      const updatedDinners = mealPlan.dinners.map(d =>
+        d.id === dinnerId ? { ...d, beveragePairing: updatedPairing } : d
+      )
+      setMealPlan({ ...mealPlan, dinners: updatedDinners })
+
+      return cocktail
+    } catch (err) {
+      setError(err.message || 'Failed to add cocktail')
+      throw err
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const removeCocktail = async (dinnerId) => {
+    setLoading(true)
+    setError(null)
+
+    try {
+      const dinner = mealPlan.dinners.find(d => d.id === dinnerId)
+      if (!dinner) throw new Error('Dinner not found')
+
+      const existingPairing = dinner.beveragePairing || {}
+      const { cocktail, ...updatedPairing } = existingPairing
+      const finalPairing = Object.keys(updatedPairing).length > 0 ? updatedPairing : null
+
+      await mealPlanService.updateDinner(dinnerId, { beveragePairing: finalPairing })
+
+      const updatedDinners = mealPlan.dinners.map(d =>
+        d.id === dinnerId ? { ...d, beveragePairing: finalPairing } : d
+      )
+      setMealPlan({ ...mealPlan, dinners: updatedDinners })
+    } catch (err) {
+      setError(err.message || 'Failed to remove cocktail')
+      throw err
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const addWinePairing = async (dinnerId) => {
+    setLoading(true)
+    setError(null)
+
+    try {
+      const dinner = mealPlan.dinners.find(d => d.id === dinnerId)
+      if (!dinner || !dinner.mainDish) {
+        throw new Error('Dinner not found or has no main dish')
+      }
+
+      const result = await beveragesAPI.regenerateWine({
+        recipeName: dinner.mainDish.name,
+        ingredients: dinner.mainDish.ingredients?.map(i => i.item) || [],
+      })
+
+      const existingPairing = dinner.beveragePairing || {}
+      const updatedPairing = { ...existingPairing, wine: result.wine }
+
+      await mealPlanService.updateDinner(dinnerId, { beveragePairing: updatedPairing })
+
+      const updatedDinners = mealPlan.dinners.map(d =>
+        d.id === dinnerId ? { ...d, beveragePairing: updatedPairing } : d
+      )
+      setMealPlan({ ...mealPlan, dinners: updatedDinners })
+
+      return result.wine
+    } catch (err) {
+      setError(err.message || 'Failed to add wine pairing')
+      throw err
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const removeWinePairing = async (dinnerId) => {
+    setLoading(true)
+    setError(null)
+
+    try {
+      const dinner = mealPlan.dinners.find(d => d.id === dinnerId)
+      if (!dinner) throw new Error('Dinner not found')
+
+      const existingPairing = dinner.beveragePairing || {}
+      const { wine, ...updatedPairing } = existingPairing
+      const finalPairing = Object.keys(updatedPairing).length > 0 ? updatedPairing : null
+
+      await mealPlanService.updateDinner(dinnerId, { beveragePairing: finalPairing })
+
+      const updatedDinners = mealPlan.dinners.map(d =>
+        d.id === dinnerId ? { ...d, beveragePairing: finalPairing } : d
+      )
+      setMealPlan({ ...mealPlan, dinners: updatedDinners })
+    } catch (err) {
+      setError(err.message || 'Failed to remove wine pairing')
+      throw err
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // Add an existing side dish from favorites to a specific meal
+  const addSideDishToMeal = async (mealId, sideDish) => {
+    const dinner = mealPlan.dinners.find(d => d.id === mealId)
+    if (!dinner) throw new Error('Meal not found')
+
+    const currentSides = dinner.sideDishes || []
+    const updatedSideDishes = [...currentSides, { ...sideDish, id: `${sideDish.id}-${Date.now()}` }]
+
+    await mealPlanService.updateDinner(mealId, { sideDishes: updatedSideDishes })
+
+    const updatedDinners = mealPlan.dinners.map(d =>
+      d.id === mealId ? { ...d, sideDishes: updatedSideDishes } : d
+    )
+    setMealPlan({ ...mealPlan, dinners: updatedDinners })
+
+    // Update grocery list (non-blocking)
+    try {
+      const newGroceryList = await groceryAPI.generateList({ meals: updatedDinners })
+      await mealPlanService.upsertGroceryList(mealPlan.id, newGroceryList)
+      setGroceryList(newGroceryList)
+    } catch (groceryErr) {
+      console.warn('Failed to update grocery list:', groceryErr)
+    }
+  }
+
+  // Add a side dish as a standalone a la carte item
+  const addAlaCarteSideDish = async (sideDish) => {
+    const regularMeals = (mealPlan?.dinners || []).filter(d => !d.isAlaCarte)
+    const alaCarte = (mealPlan?.dinners || []).filter(d => d.isAlaCarte)
+
+    const newAlaCarteData = {
+      mainDish: null,
+      sideDishes: [{ ...sideDish, id: `${sideDish.id}-${Date.now()}` }],
+      servings: 4,
+      beveragePairing: null,
+      isAlaCarte: true,
+    }
+
+    const newAlaCarte = await mealPlanService.addDinner(mealPlan.id, newAlaCarteData)
+    const updatedDinners = [...regularMeals, ...alaCarte, newAlaCarte]
+    setMealPlan({ ...mealPlan, dinners: updatedDinners })
+
+    // Update grocery list (non-blocking)
+    try {
+      const newGroceryList = await groceryAPI.generateList({ meals: updatedDinners })
+      await mealPlanService.upsertGroceryList(mealPlan.id, newGroceryList)
+      setGroceryList(newGroceryList)
+    } catch (groceryErr) {
+      console.warn('Failed to update grocery list:', groceryErr)
+    }
+  }
+
+  // Add an existing cocktail from favorites to a specific meal
+  const addCocktailToMeal = async (mealId, cocktail) => {
+    const dinner = mealPlan.dinners.find(d => d.id === mealId)
+    if (!dinner) throw new Error('Meal not found')
+
+    const currentCocktails = dinner.beveragePairing?.cocktails ||
+      (dinner.beveragePairing?.cocktail ? [dinner.beveragePairing.cocktail] : [])
+
+    const updatedBeveragePairing = {
+      ...dinner.beveragePairing,
+      cocktails: [...currentCocktails, { ...cocktail, id: `${cocktail.id}-${Date.now()}` }],
+      cocktail: null,
+    }
+
+    await mealPlanService.updateDinner(mealId, { beveragePairing: updatedBeveragePairing })
+
+    const updatedDinners = mealPlan.dinners.map(d =>
+      d.id === mealId ? { ...d, beveragePairing: updatedBeveragePairing } : d
+    )
+    setMealPlan({ ...mealPlan, dinners: updatedDinners })
+  }
+
+  // Add a cocktail as a standalone a la carte item
+  const addAlaCarteCocktail = async (cocktail) => {
+    const regularMeals = (mealPlan?.dinners || []).filter(d => !d.isAlaCarte)
+    const alaCarte = (mealPlan?.dinners || []).filter(d => d.isAlaCarte)
+
+    const newAlaCarteData = {
+      mainDish: null,
+      sideDishes: [],
+      servings: 4,
+      beveragePairing: {
+        cocktails: [{ ...cocktail, id: `${cocktail.id}-${Date.now()}` }],
+        wine: null,
+      },
+      isAlaCarte: true,
+    }
+
+    const newAlaCarte = await mealPlanService.addDinner(mealPlan.id, newAlaCarteData)
+    const updatedDinners = [...regularMeals, ...alaCarte, newAlaCarte]
+    setMealPlan({ ...mealPlan, dinners: updatedDinners })
+  }
+
   const updateGroceryItem = async (itemId, checked) => {
     const updatedItems = groceryList.items.map(item =>
       item.id === itemId ? { ...item, checked } : item
@@ -269,6 +588,21 @@ export const MealPlanProvider = ({ children }) => {
     }
   }
 
+  const refreshGroceryList = async (includeBeverages = false) => {
+    if (!mealPlan?.dinners || mealPlan.dinners.length === 0) return
+
+    try {
+      const newGroceryList = await groceryAPI.generateList({
+        meals: mealPlan.dinners,
+        includeCocktails: includeBeverages,
+      })
+      await mealPlanService.upsertGroceryList(mealPlan.id, newGroceryList)
+      setGroceryList(newGroceryList)
+    } catch (err) {
+      console.warn('Failed to refresh grocery list:', err)
+    }
+  }
+
   const value = {
     mealPlan,
     groceryList,
@@ -282,6 +616,17 @@ export const MealPlanProvider = ({ children }) => {
     clearMealPlan,
     updateGroceryItem,
     refreshMealPlan: fetchMealPlan,
+    refreshGroceryList,
+    addSideDish,
+    addSideDishToMeal,
+    addAlaCarteSideDish,
+    removeSideDish,
+    addCocktail,
+    addCocktailToMeal,
+    addAlaCarteCocktail,
+    removeCocktail,
+    addWinePairing,
+    removeWinePairing,
   }
 
   return <MealPlanContext.Provider value={value}>{children}</MealPlanContext.Provider>

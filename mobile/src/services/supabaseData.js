@@ -29,8 +29,8 @@ export const mealPlanService = {
         createdAt: mealPlan.created_at,
         dietaryPreferences: mealPlan.dietary_preferences || [],
         cuisinePreferences: mealPlan.cuisine_preferences || [],
-        proteinPreferences: mealPlan.protein_preferences || [],
-        prioritizeOverlap: mealPlan.prioritize_overlap !== false,
+        proteinPreferences: [], // Not stored in DB
+        prioritizeOverlap: true, // Not stored in DB, default to true
         dinners: mealPlan.dinners.map(d => ({
           id: d.id,
           dayOfWeek: d.day_of_week,
@@ -38,12 +38,11 @@ export const mealPlanService = {
           sideDishes: d.side_dishes || [],
           servings: d.servings,
           beveragePairing: d.beverage_pairing,
-          isAlaCarte: d.is_ala_carte,
+          isAlaCarte: d.is_a_la_carte,
         })),
       },
       groceryList: groceryList ? {
         items: groceryList.items || [],
-        categories: groceryList.categories || {},
         manualItems: groceryList.manual_items || [],
       } : null,
     }
@@ -64,10 +63,8 @@ export const mealPlanService = {
       .from('meal_plans')
       .insert({
         user_id: user.id,
-        dietary_preferences: mealPlan.dietaryPreferences,
-        cuisine_preferences: mealPlan.cuisinePreferences,
-        protein_preferences: mealPlan.proteinPreferences,
-        prioritize_overlap: mealPlan.prioritizeOverlap,
+        dietary_preferences: mealPlan.dietaryPreferences || [],
+        cuisine_preferences: mealPlan.cuisinePreferences || [],
         is_active: true,
       })
       .select()
@@ -83,7 +80,7 @@ export const mealPlanService = {
       side_dishes: d.sideDishes,
       servings: d.servings,
       beverage_pairing: d.beveragePairing,
-      is_ala_carte: d.isAlaCarte || false,
+      is_a_la_carte: d.isAlaCarte || false,
     }))
 
     const { data: dinners, error: dinnersError } = await supabase
@@ -99,8 +96,7 @@ export const mealPlanService = {
         .from('grocery_lists')
         .insert({
           meal_plan_id: newPlan.id,
-          items: groceryList.items,
-          categories: groceryList.categories,
+          items: groceryList.items || [],
           manual_items: groceryList.manualItems || [],
         })
     }
@@ -143,7 +139,7 @@ export const mealPlanService = {
         side_dishes: dinner.sideDishes || [],
         servings: dinner.servings,
         beverage_pairing: dinner.beveragePairing,
-        is_ala_carte: dinner.isAlaCarte || false,
+        is_a_la_carte: dinner.isAlaCarte || false,
       })
       .select()
       .single()
@@ -166,18 +162,36 @@ export const mealPlanService = {
   },
 
   async upsertGroceryList(mealPlanId, groceryList) {
-    const { error } = await supabase
+    // First check if a grocery list exists for this meal plan
+    const { data: existing } = await supabase
       .from('grocery_lists')
-      .upsert({
-        meal_plan_id: mealPlanId,
-        items: groceryList.items,
-        categories: groceryList.categories,
-        manual_items: groceryList.manualItems || [],
-      }, {
-        onConflict: 'meal_plan_id',
-      })
+      .select('id')
+      .eq('meal_plan_id', mealPlanId)
+      .single()
 
-    if (error) throw error
+    if (existing) {
+      // Update existing grocery list
+      const { error } = await supabase
+        .from('grocery_lists')
+        .update({
+          items: groceryList.items || [],
+          manual_items: groceryList.manualItems || [],
+        })
+        .eq('meal_plan_id', mealPlanId)
+
+      if (error) throw error
+    } else {
+      // Insert new grocery list
+      const { error } = await supabase
+        .from('grocery_lists')
+        .insert({
+          meal_plan_id: mealPlanId,
+          items: groceryList.items || [],
+          manual_items: groceryList.manualItems || [],
+        })
+
+      if (error) throw error
+    }
   },
 
   async updateGroceryList(mealPlanId, updates) {
@@ -209,7 +223,7 @@ export const favoritesService = {
       .order('created_at', { ascending: false })
 
     if (error) throw error
-    return data.map(r => ({ ...r.recipe, id: r.id, savedAt: r.created_at }))
+    return data.map(r => ({ ...r.recipe_data, id: r.id, savedAt: r.created_at }))
   },
 
   async saveRecipe(recipe) {
@@ -220,7 +234,7 @@ export const favoritesService = {
       .from('saved_recipes')
       .insert({
         user_id: user.id,
-        recipe: recipe,
+        recipe_data: recipe,
       })
       .select()
       .single()
@@ -249,7 +263,7 @@ export const favoritesService = {
       .order('created_at', { ascending: false })
 
     if (error) throw error
-    return data.map(c => ({ ...c.cocktail, id: c.id, savedAt: c.created_at }))
+    return data.map(c => ({ ...c.cocktail_data, id: c.id, savedAt: c.created_at }))
   },
 
   async saveCocktail(cocktail) {
@@ -260,7 +274,7 @@ export const favoritesService = {
       .from('saved_cocktails')
       .insert({
         user_id: user.id,
-        cocktail: cocktail,
+        cocktail_data: cocktail,
       })
       .select()
       .single()
@@ -289,7 +303,7 @@ export const favoritesService = {
       .order('created_at', { ascending: false })
 
     if (error) throw error
-    return data.map(s => ({ ...s.side_dish, id: s.id, savedAt: s.created_at }))
+    return data.map(s => ({ ...s.side_dish_data, id: s.id, savedAt: s.created_at }))
   },
 
   async saveSideDish(sideDish) {
@@ -300,7 +314,7 @@ export const favoritesService = {
       .from('saved_side_dishes')
       .insert({
         user_id: user.id,
-        side_dish: sideDish,
+        side_dish_data: sideDish,
       })
       .select()
       .single()

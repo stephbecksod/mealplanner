@@ -20,18 +20,30 @@ interface Cocktail {
   ingredients: Array<{ item: string; quantity: string }>
 }
 
+interface BeveragePairing {
+  cocktail?: Cocktail
+  cocktails?: Cocktail[]
+  wine?: {
+    type: string
+    description: string
+  }
+}
+
 interface Meal {
   mainDish: {
     name: string
     ingredients: Ingredient[]
   }
   sideDishes?: SideDish[]
+  beveragePairing?: BeveragePairing
+  // Legacy format support
   cocktails?: Cocktail[]
 }
 
 interface GenerateGroceryRequest {
   meals: Meal[]
   includeBeverages?: boolean
+  includeCocktails?: boolean
 }
 
 interface GroceryItem {
@@ -157,8 +169,26 @@ function generateGroceryList(meals: Meal[], includeBeverages: boolean): Categori
     }
 
     // Process cocktails if requested
-    if (includeBeverages && meal.cocktails) {
-      for (const cocktail of meal.cocktails) {
+    if (includeBeverages) {
+      // Get cocktails from beveragePairing (current format) or meal.cocktails (legacy)
+      const cocktails: Cocktail[] = []
+
+      if (meal.beveragePairing) {
+        // Support both single cocktail and array of cocktails
+        if (meal.beveragePairing.cocktail) {
+          cocktails.push(meal.beveragePairing.cocktail)
+        }
+        if (meal.beveragePairing.cocktails) {
+          cocktails.push(...meal.beveragePairing.cocktails)
+        }
+      }
+
+      // Legacy format support
+      if (meal.cocktails) {
+        cocktails.push(...meal.cocktails)
+      }
+
+      for (const cocktail of cocktails) {
         if (cocktail.ingredients) {
           for (const ing of cocktail.ingredients) {
             const normalized = normalizeIngredient(ing.item)
@@ -225,7 +255,11 @@ serve(async (req) => {
     const {
       meals = [],
       includeBeverages = false,
+      includeCocktails = false,
     }: GenerateGroceryRequest = await req.json()
+
+    // Support both parameter names
+    const shouldIncludeBeverages = includeBeverages || includeCocktails
 
     if (!Array.isArray(meals)) {
       return new Response(
@@ -234,7 +268,7 @@ serve(async (req) => {
       )
     }
 
-    const groceryList = generateGroceryList(meals, includeBeverages)
+    const groceryList = generateGroceryList(meals, shouldIncludeBeverages)
 
     return new Response(
       JSON.stringify({ groceryList }),
