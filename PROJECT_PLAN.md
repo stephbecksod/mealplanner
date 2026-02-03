@@ -1,20 +1,23 @@
 # Meal Planner App - Project Plan
 
 ## Project Overview
-Build a browser-based dinner planning app that generates customized weekly dinner plans with smart grocery lists, recipe storage, and beverage pairings. Built on Windows, accessible from any device with a web browser.
+Build a dinner planning app (web + mobile) that generates customized weekly dinner plans with smart grocery lists, recipe storage, and beverage pairings. Available as a web app (nomnomplan.com) and native mobile apps for iOS and Android. All platforms share the same Supabase backend for seamless cross-device sync.
 
 ## Technology Stack
-- **Frontend**: React with React Router for navigation
-- **Backend**: Node.js with Express for API routes
+- **Frontend (Web)**: React with React Router for navigation
+- **Frontend (Mobile)**: React Native with Expo (iOS & Android)
+- **Backend**: Node.js with Express for API routes (local dev)
+- **Backend (Production)**: Supabase Edge Functions (Deno)
 - **AI Integration**: Anthropic Claude API for meal/beverage generation
 - **Database**: Supabase (PostgreSQL) with Row Level Security
 - **Authentication**: Supabase Auth (email/password)
-- **Styling**: Tailwind CSS for responsive design
+- **Styling (Web)**: Tailwind CSS for responsive design
+- **Styling (Mobile)**: React Native StyleSheet
 
 ## Project Structure
 ```
 meal-planner/
-├── client/                    # React frontend
+├── client/                    # React web frontend
 │   ├── src/
 │   │   ├── components/        # Reusable UI components
 │   │   │   ├── MealCard.jsx          # Display individual meal with all components
@@ -22,18 +25,30 @@ meal-planner/
 │   │   │   ├── RecipeDetail.jsx      # Full recipe modal
 │   │   │   ├── SideDishDetail.jsx    # Side dish recipe modal
 │   │   │   ├── BeverageDetail.jsx    # Cocktail/wine detail modal
+│   │   │   ├── CustomMealForm.jsx    # Manual recipe entry form
 │   │   │   └── Navigation.jsx        # App navigation bar
 │   │   ├── pages/             # Main views (Home, Favorites, MealPlan)
-│   │   ├── services/          # API client, localStorage wrapper
+│   │   ├── services/          # API client, Supabase client
 │   │   ├── context/           # React Context for state management
 │   │   ├── utils/             # Helper functions
 │   │   └── App.jsx
 │   └── package.json
-├── server/                    # Node.js backend
+├── mobile/                    # React Native mobile app (Expo)
+│   ├── src/
+│   │   ├── screens/           # Mobile screens (Login, Home, MealPlan, etc.)
+│   │   ├── context/           # Auth and MealPlan contexts
+│   │   └── services/          # Supabase client, API client
+│   ├── App.js                 # Navigation setup
+│   ├── app.json               # Expo configuration
+│   └── package.json
+├── server/                    # Node.js backend (local development)
 │   ├── routes/                # API endpoints
 │   ├── services/              # Claude API integration
 │   ├── utils/                 # Helper functions
 │   └── server.js
+├── supabase/                  # Supabase configuration
+│   ├── functions/             # Edge Functions (production backend)
+│   └── migrations/            # Database migrations
 └── package.json
 ```
 
@@ -178,7 +193,62 @@ meal-planner/
 - ✅ Custom domain purchased (nomnomplan.com)
 - ✅ Domain added to Vercel
 - ✅ DNS records configured in Squarespace
-- ⏳ DNS propagation in progress (may take up to 48 hours)
+- ✅ DNS propagation complete
+
+### Phase 8: Advanced Generation Features ✅ COMPLETE
+**Goal**: Add more control over meal generation
+- ✅ Protein Selection - Select specific proteins (Chicken, Beef, Pork, Fish/Seafood, Tofu/Tempeh, Lamb, Turkey, Shrimp)
+- ✅ Smart protein distribution (if 3 proteins selected for 3 meals, each used exactly once)
+- ✅ Protein preferences passed to regenerate-meal for consistency
+- ✅ Ingredient Overlap Toggle - On/off control for prioritizing overlapping ingredients
+- ✅ Custom Add Meal - Manually add a custom recipe via form (CustomMealForm.jsx)
+- ✅ Custom meal form includes: name, cuisine, servings, prep/cook time, ingredients list, instructions
+- ✅ Edge Functions updated with new parameters
+- ✅ Node.js backend updated for local development
+
+### Phase 9: Mobile App (React Native / Expo) 🔄 IN PROGRESS
+**Goal**: Create native iOS and Android apps sharing the same Supabase backend
+- ✅ Expo project initialized in `mobile/` directory
+- ✅ Project linked to Expo account (owner: stephsod3, slug: nom-nom-plan)
+- ✅ React Navigation setup (native-stack + bottom-tabs)
+- ✅ Supabase client with expo-secure-store for token storage
+- ✅ AuthContext for mobile authentication
+- ✅ MealPlanContext mirroring web app logic
+- ✅ All screens created (Login, Home, MealPlan, Grocery, Profile)
+- ✅ Home screen with all generation options (dietary, cuisine, protein, toggles)
+- ⏳ Debugging render error: "expected dynamic type 'boolean', but had type 'string'"
+- ⏳ All `gap` CSS properties removed (not supported in old architecture)
+- ⏳ Need to test in Expo Go after cache clear
+
+**Mobile App Structure**:
+```
+mobile/
+├── App.js                    # Navigation setup
+├── app.json                  # Expo config
+├── .env                      # Supabase credentials
+└── src/
+    ├── context/
+    │   ├── AuthContext.js
+    │   └── MealPlanContext.js
+    ├── services/
+    │   ├── supabase.js       # SecureStore adapter
+    │   ├── api.js            # Edge Function client
+    │   └── supabaseData.js   # Database operations
+    └── screens/
+        ├── LoginScreen.js
+        ├── HomeScreen.js
+        ├── MealPlanScreen.js
+        ├── GroceryScreen.js
+        └── ProfileScreen.js
+```
+
+**Next Steps for Mobile**:
+1. Clear Expo cache: `npx expo start --clear --tunnel`
+2. Check for other incompatible style properties
+3. Test in Expo Go
+4. Add Favorites screen
+5. Add CustomMealForm for mobile
+6. Build and submit to app stores
 
 ## Key Technical Decisions
 - **Multi-user with Supabase** - PostgreSQL database with Row Level Security
@@ -368,6 +438,50 @@ user_preferences (id, user_id, default_servings, default_dietary_preferences, de
 
 ## Recent Changes (Latest Session)
 
+### Phase 9: Mobile App Development (In Progress)
+1. **React Native / Expo Setup**:
+   - Initialized Expo project in `mobile/` directory
+   - Linked to Expo account (stephsod3/nom-nom-plan)
+   - Installed dependencies: React Navigation, Supabase, SecureStore
+
+2. **Mobile Services**:
+   - Created supabase.js with SecureStore adapter for secure token storage
+   - Created api.js mirroring web app's API client
+   - Created supabaseData.js for database operations
+
+3. **Mobile Screens**:
+   - LoginScreen with email/password authentication
+   - HomeScreen with full meal generation options (dietary, cuisine, protein, toggles)
+   - MealPlanScreen displaying weekly meals with regenerate/remove
+   - GroceryScreen with categorized shopping list
+   - ProfileScreen with sign out
+
+4. **Current Issue**:
+   - Render error: "expected dynamic type 'boolean', but had type 'string'"
+   - Caused by `gap` CSS property not supported in React Native old architecture
+   - All `gap` properties removed, replaced with margin-based spacing
+   - Need to clear cache and retest
+
+### Phase 8: Advanced Generation Features (Complete)
+1. **Protein Selection**:
+   - Added PROTEIN_OPTIONS array to Home.jsx
+   - Multi-select UI for choosing proteins
+   - Smart distribution: matching proteins to meals uses each exactly once
+   - Updated Edge Functions and Node.js backend with protein prompts
+
+2. **Custom Add Meal**:
+   - Created CustomMealForm.jsx component
+   - Form with recipe name, cuisine, servings, prep/cook time, ingredients, instructions
+   - Integrated into MealPlan.jsx "Add Meal" modal
+   - Uses existing addMeal() function
+
+3. **Ingredient Overlap Toggle**:
+   - Added toggle to Home.jsx (default ON)
+   - Conditionally includes overlap instructions in AI prompts
+   - Updated all backend endpoints
+
+---
+
 ### Phase 6: Multi-User & Cloud Sync
 1. **Supabase Integration**:
    - Set up Supabase project with PostgreSQL database
@@ -484,15 +598,16 @@ All Phase 5 tasks have been completed. See MULTI_USER_MIGRATION.md for the multi
 ### Completed
 - ✅ User authentication and accounts (Supabase Auth)
 - ✅ Cloud synchronization (Supabase PostgreSQL)
+- ✅ Protein Selection - Select specific proteins for the week (Phase 8)
+- ✅ Custom Add Meal - Manually add custom recipes (Phase 8)
+- ✅ Ingredient Overlap Control - Toggle to enable/disable overlap optimization (Phase 8)
+- 🔄 Mobile App - Native iOS/Android apps (Phase 9 - In Progress)
 
 ### Recipe Customization & AI Chat
 - **Ingredient Swap** - Swap out ingredients in a recipe (e.g., make this with beef instead of chicken) or remove an ingredient entirely
 - **Recipe Chat** - Chat with AI to update a recipe (e.g., "Can you make this recipe dairy free?" or "Make it spicier")
-- **Custom Add Meal** - Manually add a custom meal on the "This Week" tab (user-created, not AI-generated)
 
 ### Generation Preferences
-- **Ingredient Overlap Control** - Slider or setting to indicate desired level of ingredient overlap (low/medium/high) when generating weekly meals
-- **Protein Selection** - Select specific proteins for the week before generation (e.g., "I want salmon, chicken, and beef this week")
 - **Pantry Inventory** - Add ingredients you already have at home so recipe generation prioritizes using what you have
 
 ### Recipe Import
