@@ -208,28 +208,45 @@ meal-planner/
 
 ### Phase 9: Mobile App (React Native / Expo) 🔄 IN PROGRESS
 **Goal**: Create native iOS and Android apps sharing the same Supabase backend
+
+**Completed:**
 - ✅ Expo project initialized in `mobile/` directory
 - ✅ Project linked to Expo account (owner: stephsod3, slug: nom-nom-plan)
 - ✅ React Navigation setup (native-stack + bottom-tabs)
 - ✅ Supabase client with expo-secure-store for token storage
 - ✅ AuthContext for mobile authentication
 - ✅ MealPlanContext mirroring web app logic
-- ✅ All screens created (Login, Home, MealPlan, Grocery, Profile)
-- ✅ Home screen with all generation options (dietary, cuisine, protein, toggles)
-- ⏳ Debugging render error: "expected dynamic type 'boolean', but had type 'string'"
-- ⏳ All `gap` CSS properties removed (not supported in old architecture)
-- ⏳ Need to test in Expo Go after cache clear
+- ✅ FavoritesContext for saved recipes/cocktails/sides
+- ✅ All screens created and working:
+  - LoginScreen - email/password authentication
+  - HomeScreen - meal generation with all options (dietary, cuisine, protein, toggles)
+  - MealPlanScreen - view/regenerate/remove meals
+  - GroceryScreen - categorized shopping checklist
+  - FavoritesScreen - tabs for recipes, cocktails, and side dishes
+  - ProfileScreen - user info and sign out
+- ✅ 5-tab navigation: Generate, This Week, Grocery, Favorites, Profile
+- ✅ Fixed render errors (Expo Go cache issue - clear cache to resolve)
+- ✅ Fixed `gap` CSS property issues (replaced with margin-based spacing)
+- ✅ Fixed react-native-screens version compatibility
+
+**Remaining:**
+- ⏳ Test meal plan generation end-to-end
+- ⏳ Add favorite toggle (star icon) on MealPlanScreen meal cards
+- ⏳ Add CustomMealForm for mobile
+- ⏳ Add "Add to Week" from Favorites
+- ⏳ Build production APK/IPA for app stores
 
 **Mobile App Structure**:
 ```
 mobile/
-├── App.js                    # Navigation setup
+├── App.js                    # Navigation setup with 5 tabs
 ├── app.json                  # Expo config
-├── .env                      # Supabase credentials
+├── .env                      # Supabase credentials (not committed)
 └── src/
     ├── context/
     │   ├── AuthContext.js
-    │   └── MealPlanContext.js
+    │   ├── MealPlanContext.js
+    │   └── FavoritesContext.js
     ├── services/
     │   ├── supabase.js       # SecureStore adapter
     │   ├── api.js            # Edge Function client
@@ -239,15 +256,15 @@ mobile/
         ├── HomeScreen.js
         ├── MealPlanScreen.js
         ├── GroceryScreen.js
+        ├── FavoritesScreen.js
         └── ProfileScreen.js
 ```
 
-**Next Steps for Mobile**:
-1. Clear Expo cache: `npx expo start --clear --tunnel`
-2. Check for other incompatible style properties
-3. Test in Expo Go
-4. Add Favorites screen
-5. Add CustomMealForm for mobile
+**How to Run Mobile App**:
+1. Navigate to mobile directory: `cd mobile`
+2. Start Expo with tunnel: `npx expo start --tunnel`
+3. Scan QR code with Expo Go app (or use generated URL)
+4. If you get render errors, clear Expo Go cache: Settings > Apps > Expo Go > Clear Cache
 6. Build and submit to app stores
 
 ## Key Technical Decisions
@@ -438,7 +455,7 @@ user_preferences (id, user_id, default_servings, default_dietary_preferences, de
 
 ## Recent Changes (Latest Session)
 
-### Phase 9: Mobile App Development (In Progress)
+### Phase 9: Mobile App Development - FUNCTIONAL
 1. **React Native / Expo Setup**:
    - Initialized Expo project in `mobile/` directory
    - Linked to Expo account (stephsod3/nom-nom-plan)
@@ -449,18 +466,25 @@ user_preferences (id, user_id, default_servings, default_dietary_preferences, de
    - Created api.js mirroring web app's API client
    - Created supabaseData.js for database operations
 
-3. **Mobile Screens**:
+3. **Mobile Screens (All Working)**:
    - LoginScreen with email/password authentication
    - HomeScreen with full meal generation options (dietary, cuisine, protein, toggles)
    - MealPlanScreen displaying weekly meals with regenerate/remove
    - GroceryScreen with categorized shopping list
+   - FavoritesScreen with tabs for recipes, cocktails, and side dishes
    - ProfileScreen with sign out
 
-4. **Current Issue**:
-   - Render error: "expected dynamic type 'boolean', but had type 'string'"
-   - Caused by `gap` CSS property not supported in React Native old architecture
-   - All `gap` properties removed, replaced with margin-based spacing
-   - Need to clear cache and retest
+4. **Issues Resolved**:
+   - Fixed "tried to register two views with the same name RNCSafeAreaProvider" - cleared Expo Go cache
+   - Fixed "expected dynamic type 'boolean'" error - removed `gap` CSS properties
+   - Fixed react-native-screens version mismatch - downgraded to ~4.16.0
+
+5. **Mobile App Status**:
+   - ✅ App runs in Expo Go
+   - ✅ Authentication works (login/logout)
+   - ✅ All 5 tabs display correctly
+   - ✅ Favorites tab added with FavoritesContext
+   - ⏳ Need to test meal generation and full workflow
 
 ### Phase 8: Advanced Generation Features (Complete)
 1. **Protein Selection**:
