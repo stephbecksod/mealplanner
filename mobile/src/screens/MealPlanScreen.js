@@ -665,7 +665,7 @@ const MealPlanScreen = ({ navigation }) => {
               style={styles.addMealOption}
               onPress={() => {
                 setShowAddMealModal(false)
-                Alert.alert('Coming Soon', 'Custom recipe entry will be available in a future update.')
+                navigation.navigate('CustomMeal')
               }}
             >
               <Text style={styles.addMealOptionIcon}>✏️</Text>

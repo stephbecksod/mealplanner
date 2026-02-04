@@ -15,6 +15,7 @@ import MealPlanScreen from './src/screens/MealPlanScreen'
 import GroceryScreen from './src/screens/GroceryScreen'
 import FavoritesScreen from './src/screens/FavoritesScreen'
 import ProfileScreen from './src/screens/ProfileScreen'
+import CustomMealScreen from './src/screens/CustomMealScreen'
 
 const Stack = createNativeStackNavigator()
 const Tab = createBottomTabNavigator()
@@ -101,13 +102,28 @@ const AppNavigator = () => {
     )
   }
 
+  if (!isAuthenticated) {
+    return (
+      <Stack.Navigator screenOptions={{ headerShown: false }}>
+        <Stack.Screen name="Login" component={LoginScreen} />
+      </Stack.Navigator>
+    )
+  }
+
   return (
     <Stack.Navigator screenOptions={{ headerShown: false }}>
-      {isAuthenticated ? (
-        <Stack.Screen name="Main" component={TabNavigator} />
-      ) : (
-        <Stack.Screen name="Login" component={LoginScreen} />
-      )}
+      <Stack.Screen name="Main" component={TabNavigator} />
+      <Stack.Screen
+        name="CustomMeal"
+        component={CustomMealScreen}
+        options={{
+          headerShown: true,
+          title: 'Add Custom Recipe',
+          headerStyle: { backgroundColor: '#16A34A' },
+          headerTintColor: '#fff',
+          headerTitleStyle: { fontWeight: '600' },
+        }}
+      />
     </Stack.Navigator>
   )
 }
