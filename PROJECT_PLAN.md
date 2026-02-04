@@ -206,7 +206,7 @@ meal-planner/
 - ✅ Edge Functions updated with new parameters
 - ✅ Node.js backend updated for local development
 
-### Phase 9: Mobile App (React Native / Expo) 🔄 IN PROGRESS
+### Phase 9: Mobile App (React Native / Expo) ✅ COMPLETE
 **Goal**: Create native iOS and Android apps sharing the same Supabase backend
 
 **Completed:**
@@ -221,9 +221,10 @@ meal-planner/
   - LoginScreen - email/password authentication
   - HomeScreen - meal generation with all options (dietary, cuisine, protein, toggles)
   - MealPlanScreen - view/regenerate/remove meals with enhanced MealCard
-  - GroceryScreen - categorized shopping checklist with beverage toggle
+  - GroceryScreen - categorized shopping checklist with beverage toggle + manual item add
   - FavoritesScreen - tabs for recipes, sides, cocktails with add-to-plan
   - ProfileScreen - user info and sign out
+  - CustomMealScreen - manual recipe entry form with custom dropdown components
 - ✅ 5-tab navigation: Generate, This Week, Grocery, Favorites, Profile
 - ✅ Fixed render errors (Expo Go cache issue - clear cache to resolve)
 - ✅ Fixed `gap` CSS property issues (replaced with margin-based spacing)
@@ -236,21 +237,24 @@ meal-planner/
 - ✅ Add to Week from Favorites (recipes add directly, sides/cocktails show day picker + a la carte)
 - ✅ "Included in Week" state for items already in meal plan
 - ✅ Day numbering format ("Day 1", "Day 2" instead of weekday names)
-- ✅ "Add Another Meal" button (generates directly, no day picker)
+- ✅ "Add Another Meal" button with three options (Generate, Custom, Favorites)
 - ✅ Fixed Supabase upsert for grocery lists (removed ON CONFLICT)
 - ✅ Fixed cocktail ingredients in grocery list (Edge Function update)
+- ✅ Custom Dropdown component (modal-based) for better mobile UX
+- ✅ Multiple cocktails per meal support (cocktails array format)
+- ✅ Manual grocery item addition with category selection
+- ✅ Smart grocery quantity aggregation (parses fractions, combines totals)
 
-**Remaining:**
-- ⏳ Add CustomMealForm for mobile
+**Remaining for App Store Release:**
 - ⏳ Build production APK/IPA for app stores
 
 **Mobile App Structure**:
 ```
 mobile/
-├── App.js                    # Navigation setup with 5 tabs
+├── App.js                    # Navigation setup with 5 tabs + CustomMeal stack
 ├── app.json                  # Expo config
 ├── .env                      # Supabase credentials (not committed)
-├── MOBILE_DEV.md             # Mobile development guide
+├── MOBILE_DEV.MD             # Mobile development guide
 └── src/
     ├── components/
     │   ├── RecipeDetailModal.js      # Full recipe view modal
@@ -258,7 +262,7 @@ mobile/
     │   └── BeverageDetailModal.js    # Cocktail/wine detail modal
     ├── context/
     │   ├── AuthContext.js
-    │   ├── MealPlanContext.js        # Includes add/remove side/cocktail/wine
+    │   ├── MealPlanContext.js        # Includes add/remove side/cocktail/wine + addManualGroceryItem
     │   └── FavoritesContext.js
     ├── services/
     │   ├── supabase.js       # SecureStore adapter
@@ -267,10 +271,11 @@ mobile/
     └── screens/
         ├── LoginScreen.js
         ├── HomeScreen.js
-        ├── MealPlanScreen.js         # Enhanced with detail modals & actions
-        ├── GroceryScreen.js          # With beverage toggle
+        ├── MealPlanScreen.js         # Enhanced with detail modals & Add Meal modal
+        ├── GroceryScreen.js          # With beverage toggle + manual item add
         ├── FavoritesScreen.js        # With add-to-plan & day picker
-        └── ProfileScreen.js
+        ├── ProfileScreen.js
+        └── CustomMealScreen.js       # Manual recipe entry form
 ```
 
 **How to Run Mobile App**:
@@ -399,16 +404,17 @@ https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=exp://YOUR-TUNNEL-
     {
       id: string,
       item: string,
-      quantity: string,
+      quantity: string,           // Smart aggregation: "4½" not "1 large + ½ medium + ..."
       category: string,
       checked: boolean,
-      mealIds: [string] // which meals need this ingredient
+      mealIds: [string]           // which meals need this ingredient
     }
   ],
   manualItems: [
     {
       id: string,
       item: string,
+      category: string,           // User-selected category (produce, protein, etc.)
       checked: boolean
     }
   ]
@@ -479,7 +485,53 @@ user_preferences (id, user_id, default_servings, default_dietary_preferences, de
 
 ## Recent Changes (Latest Session)
 
-### Mobile App Feature Parity (Complete)
+### Grocery List Enhancements (Web + Mobile)
+1. **Manual Item Addition with Category Selection**:
+   - Added text input + category dropdown to add custom items
+   - Categories: Produce, Protein, Dairy, Pantry, Spices, Beverages, Other
+   - Items appear in their selected category section (not a separate "Custom Items" section)
+   - Items with "Other" or no category appear in the "Other" section
+   - Mobile uses custom modal-based dropdown for better UX
+
+2. **Smart Quantity Aggregation**:
+   - Improved `combineQuantities()` function in `server/routes/grocery.js`
+   - Parses unicode fractions: ½, ¼, ¾, ⅓, ⅔, etc.
+   - Parses text fractions: 1/2, 1/4, etc.
+   - Extracts numbers from descriptive text: "4 cloves, minced" → 4
+   - Combines totals and formats nicely: "4½" instead of "4.5"
+   - Example: "1 large + ½ medium diced + 1 large + 1 medium" → "4½"
+   - Example: "8 cloves minced + 4 cloves + 1 clove + 4 cloves + 4 cloves" → "21"
+
+3. **Files Modified**:
+   - `server/routes/grocery.js` - New parseQuantity() and improved combineQuantities()
+   - `client/src/utils/groceryUtils.js` - Same logic for client-side
+   - `client/src/components/GroceryList.jsx` - Category dropdown UI
+   - `client/src/context/MealPlanContext.jsx` - addManualGroceryItem accepts category
+   - `mobile/src/screens/GroceryScreen.js` - Manual item input with dropdown
+   - `mobile/src/context/MealPlanContext.js` - Added addManualGroceryItem function
+
+### Custom Meal Entry (Mobile)
+1. **CustomMealScreen.js** - Full recipe entry form:
+   - Recipe name, cuisine (dropdown), servings, prep/cook time
+   - Dynamic ingredients list (add/remove) with item, quantity, category
+   - Dynamic instructions list (add/remove)
+   - Custom modal-based Dropdown component (replaces native Picker for better UX)
+   - Form validation for required fields
+   - Navigates from MealPlanScreen via "Add Meal" → "Enter Custom Recipe"
+
+2. **Add Meal Modal** (MealPlanScreen.js):
+   - Three options: Generate New Meal, Enter Custom Recipe, Add from Favorites
+   - Loading indicator between last meal card and Add Meal button
+   - Generates meal directly with current preferences
+
+3. **UI Fixes**:
+   - Fixed button alignment on main dish row (added remove placeholder)
+   - Fixed bottom navigation padding (paddingBottom: 20, height: 75)
+   - Fixed multiple cocktails display (maps over cocktails array)
+
+---
+
+### Previous Session: Mobile App Feature Parity
 Brought the React Native mobile app to full feature parity with the web app.
 
 1. **Detail Modals** (new components):
@@ -683,7 +735,9 @@ All Phase 5 tasks have been completed. See MULTI_USER_MIGRATION.md for the multi
 - ✅ Protein Selection - Select specific proteins for the week (Phase 8)
 - ✅ Custom Add Meal - Manually add custom recipes (Phase 8)
 - ✅ Ingredient Overlap Control - Toggle to enable/disable overlap optimization (Phase 8)
-- 🔄 Mobile App - Native iOS/Android apps (Phase 9 - In Progress)
+- ✅ Mobile App - Native iOS/Android apps with full feature parity (Phase 9)
+- ✅ Smart Grocery Quantity Aggregation - Combines "1 large + ½ medium" into "1½"
+- ✅ Manual Grocery Items with Categories - Add custom items to specific categories
 
 ### Recipe Customization & AI Chat
 - **Ingredient Swap** - Swap out ingredients in a recipe (e.g., make this with beef instead of chicken) or remove an ingredient entirely
