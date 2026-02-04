@@ -60,7 +60,9 @@ const MealCard = ({ dinner, dayIndex, onRegenerate, onRemove, loading: parentLoa
   if (!mainDish) return null
 
   const isMainSaved = isRecipeSaved(mainDish)
-  const cocktail = beveragePairing?.cocktail
+  // Support both cocktails array and single cocktail
+  const cocktails = beveragePairing?.cocktails ||
+    (beveragePairing?.cocktail ? [beveragePairing.cocktail] : [])
   const wine = beveragePairing?.wine
   const totalTime = (mainDish.prepTime || 0) + (mainDish.cookTime || 0)
 
@@ -131,10 +133,10 @@ const MealCard = ({ dinner, dayIndex, onRegenerate, onRemove, loading: parentLoa
     }
   }
 
-  const handleRemoveCocktail = () => {
+  const handleRemoveCocktail = (cocktailItem) => {
     Alert.alert(
       'Remove Cocktail',
-      `Remove "${cocktail.name}" from this meal?`,
+      `Remove "${cocktailItem.name}" from this meal?`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -142,7 +144,7 @@ const MealCard = ({ dinner, dayIndex, onRegenerate, onRemove, loading: parentLoa
           style: 'destructive',
           onPress: async () => {
             try {
-              await removeCocktail(dinner.id)
+              await removeCocktail(dinner.id, cocktailItem.id)
             } catch (error) {
               Alert.alert('Error', 'Failed to remove cocktail')
             }
@@ -232,6 +234,8 @@ const MealCard = ({ dinner, dayIndex, onRegenerate, onRemove, loading: parentLoa
             >
               <StarIcon filled={isMainSaved} />
             </TouchableOpacity>
+            {/* Placeholder to align with side dishes/cocktails that have remove button */}
+            <View style={styles.removePlaceholder} />
           </View>
         </View>
 
@@ -288,56 +292,60 @@ const MealCard = ({ dinner, dayIndex, onRegenerate, onRemove, loading: parentLoa
           )}
         </TouchableOpacity>
 
-        {/* Cocktail */}
+        {/* Cocktails */}
         <View style={styles.sectionHeader}>
-          <Text style={styles.sectionLabel}>COCKTAIL</Text>
+          <Text style={styles.sectionLabel}>{cocktails.length > 1 ? 'COCKTAILS' : 'COCKTAIL'}</Text>
         </View>
-        {cocktail ? (
-          <View style={styles.itemRow}>
-            <TouchableOpacity
-              style={styles.itemInfo}
-              onPress={() => setShowBeverageModal({ beverage: cocktail, type: 'cocktail' })}
-            >
-              <Text style={styles.itemName}>{cocktail.name}</Text>
-            </TouchableOpacity>
-            <View style={styles.itemActions}>
-              <TouchableOpacity
-                style={styles.viewButton}
-                onPress={() => setShowBeverageModal({ beverage: cocktail, type: 'cocktail' })}
-              >
-                <Text style={styles.viewButtonText}>View</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.starButton, isCocktailSaved(cocktail) && styles.starButtonActive]}
-                onPress={() => handleToggleCocktailFavorite(cocktail)}
-              >
-                <StarIcon filled={isCocktailSaved(cocktail)} />
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.removeButton}
-                onPress={handleRemoveCocktail}
-                disabled={isDisabled}
-              >
-                <CloseIcon />
-              </TouchableOpacity>
-            </View>
-          </View>
-        ) : (
-          <TouchableOpacity
-            style={[styles.addButton, styles.addButtonPurple, loadingAction === 'cocktail' && styles.addButtonLoading]}
-            onPress={handleAddCocktail}
-            disabled={isDisabled}
-          >
-            {loadingAction === 'cocktail' ? (
-              <ActivityIndicator size="small" color="#7C3AED" />
-            ) : (
-              <>
-                <PlusIcon />
-                <Text style={[styles.addButtonText, styles.addButtonTextPurple]}>Add Cocktail</Text>
-              </>
-            )}
-          </TouchableOpacity>
-        )}
+        {cocktails.length > 0 ? (
+          cocktails.map((cocktailItem, index) => {
+            const isSaved = isCocktailSaved(cocktailItem)
+            return (
+              <View key={cocktailItem.id || index} style={styles.itemRow}>
+                <TouchableOpacity
+                  style={styles.itemInfo}
+                  onPress={() => setShowBeverageModal({ beverage: cocktailItem, type: 'cocktail' })}
+                >
+                  <Text style={styles.itemName}>{cocktailItem.name}</Text>
+                </TouchableOpacity>
+                <View style={styles.itemActions}>
+                  <TouchableOpacity
+                    style={styles.viewButton}
+                    onPress={() => setShowBeverageModal({ beverage: cocktailItem, type: 'cocktail' })}
+                  >
+                    <Text style={styles.viewButtonText}>View</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.starButton, isSaved && styles.starButtonActive]}
+                    onPress={() => handleToggleCocktailFavorite(cocktailItem)}
+                  >
+                    <StarIcon filled={isSaved} />
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.removeButton}
+                    onPress={() => handleRemoveCocktail(cocktailItem)}
+                    disabled={isDisabled}
+                  >
+                    <CloseIcon />
+                  </TouchableOpacity>
+                </View>
+              </View>
+            )
+          })
+        ) : null}
+        <TouchableOpacity
+          style={[styles.addButton, styles.addButtonPurple, loadingAction === 'cocktail' && styles.addButtonLoading]}
+          onPress={handleAddCocktail}
+          disabled={isDisabled}
+        >
+          {loadingAction === 'cocktail' ? (
+            <ActivityIndicator size="small" color="#7C3AED" />
+          ) : (
+            <>
+              <PlusIcon />
+              <Text style={[styles.addButtonText, styles.addButtonTextPurple]}>Add Cocktail</Text>
+            </>
+          )}
+        </TouchableOpacity>
 
         {/* Wine */}
         <View style={styles.sectionHeader}>
@@ -424,9 +432,12 @@ const MealCard = ({ dinner, dayIndex, onRegenerate, onRemove, loading: parentLoa
 }
 
 const MealPlanScreen = ({ navigation }) => {
-  const { mealPlan, groceryList, regenerateMeal, removeMeal, clearMealPlan, loading, addMeal } = useMealPlan()
+  const { mealPlan, groceryList, regenerateMeal, removeMeal, clearMealPlan, loading, addMeal, generateNewMeal } = useMealPlan()
+  const { savedRecipes } = useFavorites()
   const [showClearModal, setShowClearModal] = useState(false)
   const [addingMeal, setAddingMeal] = useState(false)
+  const [showAddMealModal, setShowAddMealModal] = useState(false)
+  const [generatingMeal, setGeneratingMeal] = useState(false)
 
 
   if (!mealPlan || !mealPlan.dinners || mealPlan.dinners.length === 0) {
@@ -499,43 +510,39 @@ const MealPlanScreen = ({ navigation }) => {
     }
   }
 
-  const handleAddMeal = async () => {
+  const handleGenerateNewMeal = async () => {
+    setGeneratingMeal(true)
+    try {
+      await generateNewMeal(4)
+      setShowAddMealModal(false)
+    } catch (error) {
+      Alert.alert('Error', 'Failed to generate new meal')
+    } finally {
+      setGeneratingMeal(false)
+    }
+  }
+
+  const handleAddFromFavorites = async (recipe) => {
     setAddingMeal(true)
     try {
-      // Generate a new meal using the existing preferences
-      const { mealsAPI } = require('../services/api')
-      const existingMeals = mealPlan.dinners
-        .filter(d => d.mainDish)
-        .map(d => ({
-          name: d.mainDish.name,
-          ingredients: d.mainDish.ingredients?.map(i => i.item) || [],
-        }))
-
-      const newRecipe = await mealsAPI.regenerateMeal({
-        dietaryPreferences: mealPlan.dietaryPreferences || [],
-        cuisinePreferences: mealPlan.cuisinePreferences || [],
-        proteinPreferences: mealPlan.proteinPreferences || [],
-        servings: 4,
-        includeSides: true,
-        existingMeals,
-        prioritizeOverlap: mealPlan.prioritizeOverlap !== false,
-      })
-
-      const { sideDish, ...mainDish } = newRecipe
-
-      // Day is determined by index, no need to specify
-      await addMeal({
-        mainDish,
-        sideDishes: sideDish ? [sideDish] : [],
-        servings: 4,
-        beveragePairing: null,
-        isAlaCarte: false,
-      })
+      await addMeal(recipe, 4)
+      setShowAddMealModal(false)
     } catch (error) {
-      Alert.alert('Error', 'Failed to add meal')
+      Alert.alert('Error', 'Failed to add meal from favorites')
     } finally {
       setAddingMeal(false)
     }
+  }
+
+  // Get recipes that are not already in the meal plan
+  const getAvailableFavorites = () => {
+    const existingRecipeNames = mealPlan.dinners
+      .filter(d => d.mainDish)
+      .map(d => d.mainDish.name.toLowerCase())
+
+    return savedRecipes.filter(
+      recipe => !existingRecipeNames.includes(recipe.name.toLowerCase())
+    )
   }
 
   const canAddMoreMeals = mealPlan.dinners.length < 7
@@ -553,10 +560,10 @@ const MealPlanScreen = ({ navigation }) => {
           </TouchableOpacity>
         </View>
 
-        {(loading || addingMeal) && (
+        {loading && !generatingMeal && (
           <View style={styles.loadingOverlay}>
             <ActivityIndicator size="large" color="#16A34A" />
-            <Text style={styles.loadingText}>{addingMeal ? 'Adding meal...' : 'Updating...'}</Text>
+            <Text style={styles.loadingText}>Updating...</Text>
           </View>
         )}
 
@@ -567,15 +574,23 @@ const MealPlanScreen = ({ navigation }) => {
             dayIndex={index}
             onRegenerate={() => handleRegenerate(dinner.id)}
             onRemove={() => handleRemove(dinner.id)}
-            loading={loading || addingMeal}
+            loading={loading || generatingMeal}
           />
         ))}
 
+        {/* Loading indicator for new meal - appears between meals and button */}
+        {generatingMeal && (
+          <View style={styles.generatingMealOverlay}>
+            <ActivityIndicator size="large" color="#16A34A" />
+            <Text style={styles.generatingMealText}>Generating new meal...</Text>
+          </View>
+        )}
+
         {canAddMoreMeals && (
           <TouchableOpacity
-            style={styles.addMealButton}
-            onPress={handleAddMeal}
-            disabled={loading || addingMeal}
+            style={[styles.addMealButton, generatingMeal && styles.addMealButtonDisabled]}
+            onPress={() => setShowAddMealModal(true)}
+            disabled={loading || generatingMeal}
           >
             <Text style={styles.addMealButtonText}>+ Add Another Meal</Text>
           </TouchableOpacity>
@@ -606,6 +621,114 @@ const MealPlanScreen = ({ navigation }) => {
                 <Text style={styles.modalConfirmText}>Clear All</Text>
               </TouchableOpacity>
             </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Add Meal Modal */}
+      <Modal
+        visible={showAddMealModal}
+        transparent
+        animationType="fade"
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.addMealModalContent}>
+            <View style={styles.addMealModalHeader}>
+              <Text style={styles.modalTitle}>Add Meal</Text>
+              <TouchableOpacity onPress={() => setShowAddMealModal(false)}>
+                <Text style={styles.modalCloseButton}>×</Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Generate New Meal Option */}
+            <TouchableOpacity
+              style={[styles.addMealOption, styles.addMealOptionPrimary, generatingMeal && styles.addMealOptionDisabled]}
+              onPress={handleGenerateNewMeal}
+              disabled={generatingMeal || addingMeal}
+            >
+              {generatingMeal ? (
+                <View style={styles.addMealOptionLoading}>
+                  <ActivityIndicator size="small" color="#16A34A" />
+                  <Text style={styles.addMealOptionPrimaryText}>Generating New Meal...</Text>
+                </View>
+              ) : (
+                <>
+                  <Text style={styles.addMealOptionIcon}>⚡</Text>
+                  <Text style={styles.addMealOptionPrimaryText}>Generate New Meal</Text>
+                </>
+              )}
+            </TouchableOpacity>
+            <Text style={styles.addMealOptionSubtext}>Let AI create a new recipe for you</Text>
+
+            {/* Add Custom Recipe Option */}
+            <TouchableOpacity
+              style={styles.addMealOption}
+              onPress={() => {
+                setShowAddMealModal(false)
+                Alert.alert('Coming Soon', 'Custom recipe entry will be available in a future update.')
+              }}
+            >
+              <Text style={styles.addMealOptionIcon}>✏️</Text>
+              <Text style={styles.addMealOptionText}>Add Custom Recipe</Text>
+            </TouchableOpacity>
+            <Text style={styles.addMealOptionSubtext}>Enter your own recipe manually</Text>
+
+            {/* Divider */}
+            <View style={styles.addMealDivider}>
+              <View style={styles.addMealDividerLine} />
+              <Text style={styles.addMealDividerText}>or add from favorites</Text>
+              <View style={styles.addMealDividerLine} />
+            </View>
+
+            {/* Favorites Section */}
+            <ScrollView style={styles.favoritesScrollView} showsVerticalScrollIndicator={false}>
+              {(() => {
+                const availableFavorites = getAvailableFavorites()
+
+                if (savedRecipes.length === 0) {
+                  return (
+                    <Text style={styles.noFavoritesText}>No favorites saved</Text>
+                  )
+                }
+
+                if (availableFavorites.length === 0) {
+                  return (
+                    <View style={styles.allFavoritesInPlan}>
+                      <Text style={styles.allFavoritesInPlanText}>
+                        All favorite meals are already included in the meal plan
+                      </Text>
+                    </View>
+                  )
+                }
+
+                return availableFavorites.map((recipe) => (
+                  <View key={recipe.id} style={styles.favoriteItem}>
+                    <View style={styles.favoriteItemInfo}>
+                      <Text style={styles.favoriteItemName}>{recipe.name}</Text>
+                      <Text style={styles.favoriteItemCuisine}>{recipe.cuisine}</Text>
+                    </View>
+                    <TouchableOpacity
+                      style={styles.addFromFavoriteButton}
+                      onPress={() => handleAddFromFavorites(recipe)}
+                      disabled={addingMeal}
+                    >
+                      {addingMeal ? (
+                        <ActivityIndicator size="small" color="#fff" />
+                      ) : (
+                        <Text style={styles.addFromFavoriteText}>Add to Week</Text>
+                      )}
+                    </TouchableOpacity>
+                  </View>
+                ))
+              })()}
+            </ScrollView>
+
+            <TouchableOpacity
+              style={styles.addMealCancelButton}
+              onPress={() => setShowAddMealModal(false)}
+            >
+              <Text style={styles.addMealCancelText}>Cancel</Text>
+            </TouchableOpacity>
           </View>
         </View>
       </Modal>
@@ -796,6 +919,9 @@ const styles = StyleSheet.create({
     padding: 6,
     borderRadius: 6,
   },
+  removePlaceholder: {
+    width: 28,
+  },
   addButton: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -828,10 +954,31 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginTop: 8,
   },
+  addMealButtonDisabled: {
+    opacity: 0.6,
+  },
   addMealButtonText: {
     color: '#fff',
     fontSize: 16,
     fontWeight: '600',
+  },
+  generatingMealOverlay: {
+    backgroundColor: '#fff',
+    padding: 24,
+    borderRadius: 16,
+    alignItems: 'center',
+    marginBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  generatingMealText: {
+    marginTop: 12,
+    fontSize: 16,
+    color: '#16A34A',
+    fontWeight: '500',
   },
   loadingOverlay: {
     backgroundColor: 'rgba(255,255,255,0.9)',
@@ -893,6 +1040,147 @@ const styles = StyleSheet.create({
   },
   modalConfirmText: {
     color: '#fff',
+    fontWeight: '600',
+  },
+  modalCloseButton: {
+    fontSize: 28,
+    color: '#6B7280',
+    fontWeight: 'bold',
+  },
+  addMealModalContent: {
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    padding: 24,
+    width: '100%',
+    maxHeight: '80%',
+  },
+  addMealModalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  addMealOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 16,
+    paddingHorizontal: 20,
+    borderWidth: 2,
+    borderColor: '#E5E7EB',
+    borderRadius: 12,
+    marginBottom: 8,
+    gap: 12,
+  },
+  addMealOptionPrimary: {
+    borderColor: '#16A34A',
+    backgroundColor: '#F0FDF4',
+  },
+  addMealOptionDisabled: {
+    opacity: 0.7,
+  },
+  addMealOptionLoading: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  addMealOptionIcon: {
+    fontSize: 20,
+  },
+  addMealOptionText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#374151',
+  },
+  addMealOptionPrimaryText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#16A34A',
+  },
+  addMealOptionSubtext: {
+    fontSize: 13,
+    color: '#6B7280',
+    textAlign: 'center',
+    marginBottom: 16,
+  },
+  addMealDivider: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: 16,
+  },
+  addMealDividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: '#E5E7EB',
+  },
+  addMealDividerText: {
+    paddingHorizontal: 12,
+    fontSize: 14,
+    color: '#6B7280',
+  },
+  favoritesScrollView: {
+    maxHeight: 200,
+    marginBottom: 16,
+  },
+  noFavoritesText: {
+    fontSize: 14,
+    color: '#6B7280',
+    textAlign: 'center',
+    paddingVertical: 16,
+  },
+  allFavoritesInPlan: {
+    backgroundColor: '#F3F4F6',
+    padding: 16,
+    borderRadius: 8,
+  },
+  allFavoritesInPlanText: {
+    fontSize: 14,
+    color: '#6B7280',
+    textAlign: 'center',
+  },
+  favoriteItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 8,
+  },
+  favoriteItemInfo: {
+    flex: 1,
+    marginRight: 12,
+  },
+  favoriteItemName: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#1F2937',
+  },
+  favoriteItemCuisine: {
+    fontSize: 13,
+    color: '#6B7280',
+    marginTop: 2,
+  },
+  addFromFavoriteButton: {
+    backgroundColor: '#16A34A',
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    borderRadius: 8,
+  },
+  addFromFavoriteText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  addMealCancelButton: {
+    backgroundColor: '#F3F4F6',
+    paddingVertical: 14,
+    borderRadius: 10,
+    alignItems: 'center',
+  },
+  addMealCancelText: {
+    color: '#374151',
     fontWeight: '600',
   },
 })

@@ -105,6 +105,15 @@ meal-planner/
 │   └── migrations/                   # SQL migration files
 │       └── 001_initial_schema.sql    # Tables, RLS policies, triggers
 │
+├── mobile/                           # React Native mobile app (Expo)
+│   ├── app/                          # Expo Router file-based routing
+│   ├── components/                   # Mobile UI components
+│   ├── services/                     # API and Supabase clients
+│   ├── context/                      # React Context providers
+│   ├── app.json                      # Expo configuration
+│   ├── MOBILE_DEV.md                 # Mobile-specific development guide
+│   └── package.json
+│
 ├── .gitignore                        # Git ignore rules
 ├── PROJECT_PLAN.md                   # Detailed feature roadmap
 ├── CLAUDE.md                         # This file
@@ -382,6 +391,38 @@ Returns: CategorizedGroceryList
 - Show loading states for all API calls
 - Consider caching frequently used data
 - Batch grocery list updates when adding/removing meals
+
+## Mobile Development
+
+A React Native mobile app exists in `mobile/` using Expo SDK 54. See `mobile/MOBILE_DEV.md` for detailed instructions.
+
+### Quick Reference: Starting Mobile Dev Server
+
+```bash
+cd mobile
+npx expo start --tunnel --port 19000
+```
+
+### Getting the Expo Go URL (Important!)
+
+The newer Expo CLI doesn't show a web QR code page. To get the correct URL:
+
+1. **After starting the server**, run:
+   ```bash
+   curl -s http://localhost:19000 | grep -o '"hostUri":"[^"]*"'
+   ```
+
+2. **The tunnel URL format is**: `exp://[random-id]-[port].exp.direct`
+   - Example: `exp://uybyjrg-anonymous-19000.exp.direct`
+
+3. **Generate a scannable QR code**:
+   ```
+   https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=exp://YOUR-TUNNEL-URL
+   ```
+
+4. **Or enter manually** in Expo Go app: tap "Enter URL manually"
+
+**Note**: Simple `exp://192.168.x.x:port` URLs often don't work due to network/firewall issues. Always use `--tunnel` mode for reliable physical device testing.
 
 ## Multi-User Architecture (Completed)
 
