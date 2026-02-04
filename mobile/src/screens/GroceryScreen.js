@@ -1,9 +1,66 @@
 import { useState, useEffect } from 'react'
-import { View, Text, ScrollView, TouchableOpacity, Switch, StyleSheet } from 'react-native'
+import { View, Text, ScrollView, TouchableOpacity, Switch, StyleSheet, TextInput, Modal, FlatList } from 'react-native'
 import { useMealPlan } from '../context/MealPlanContext'
 
+const GROCERY_CATEGORIES = [
+  { value: 'produce', label: 'Produce' },
+  { value: 'protein', label: 'Protein' },
+  { value: 'dairy', label: 'Dairy' },
+  { value: 'pantry', label: 'Pantry' },
+  { value: 'spices', label: 'Spices' },
+  { value: 'beverages', label: 'Beverages' },
+  { value: 'other', label: 'Other' },
+]
+
+const CategoryDropdown = ({ value, onSelect }) => {
+  const [visible, setVisible] = useState(false)
+  const selectedCategory = GROCERY_CATEGORIES.find(c => c.value === value)
+
+  return (
+    <>
+      <TouchableOpacity style={styles.categoryDropdown} onPress={() => setVisible(true)}>
+        <Text style={styles.categoryDropdownText}>
+          {selectedCategory?.label || 'Other'}
+        </Text>
+        <Text style={styles.dropdownArrow}>▼</Text>
+      </TouchableOpacity>
+      <Modal visible={visible} transparent animationType="fade">
+        <TouchableOpacity
+          style={styles.dropdownOverlay}
+          activeOpacity={1}
+          onPress={() => setVisible(false)}
+        >
+          <View style={styles.dropdownModal}>
+            <Text style={styles.dropdownTitle}>Select Category</Text>
+            <FlatList
+              data={GROCERY_CATEGORIES}
+              keyExtractor={(item) => item.value}
+              renderItem={({ item }) => (
+                <TouchableOpacity
+                  style={[styles.dropdownOption, value === item.value && styles.dropdownOptionSelected]}
+                  onPress={() => {
+                    onSelect(item.value)
+                    setVisible(false)
+                  }}
+                >
+                  <Text style={[styles.dropdownOptionText, value === item.value && styles.dropdownOptionTextSelected]}>
+                    {item.label}
+                  </Text>
+                  {value === item.value && <Text style={styles.dropdownCheckmark}>✓</Text>}
+                </TouchableOpacity>
+              )}
+            />
+          </View>
+        </TouchableOpacity>
+      </Modal>
+    </>
+  )
+}
+
 const GroceryScreen = () => {
-  const { groceryList, mealPlan, updateGroceryItem, refreshGroceryList } = useMealPlan()
+  const { groceryList, mealPlan, updateGroceryItem, addManualGroceryItem, refreshGroceryList } = useMealPlan()
+  const [newItem, setNewItem] = useState('')
+  const [newItemCategory, setNewItemCategory] = useState('other')
   const [includeBeverages, setIncludeBeverages] = useState(false)
   const [checkedWines, setCheckedWines] = useState({})
 
@@ -37,10 +94,29 @@ const GroceryScreen = () => {
     )
   }
 
+  const handleAddItem = () => {
+    if (newItem.trim()) {
+      addManualGroceryItem(newItem.trim(), newItemCategory)
+      setNewItem('')
+      setNewItemCategory('other')
+    }
+  }
+
+  // Combine regular items with manual items that have categories
+  const allItems = [
+    ...groceryList.items,
+    ...(groceryList.manualItems || []).filter(item => item.category && item.category !== 'other'),
+  ]
+
+  // Get manual items without category or with 'other' category
+  const uncategorizedManualItems = (groceryList.manualItems || []).filter(
+    item => !item.category || item.category === 'other'
+  )
+
   // Group items by category
   const categories = {}
-  for (const item of groceryList.items) {
-    const category = item.category || 'Other'
+  for (const item of allItems) {
+    const category = item.category || 'other'
     if (!categories[category]) {
       categories[category] = []
     }
@@ -89,6 +165,29 @@ const GroceryScreen = () => {
           />
         </View>
       )}
+
+      <View style={styles.addItemContainer}>
+        <View style={styles.addItemRow}>
+          <TextInput
+            style={styles.addItemInput}
+            value={newItem}
+            onChangeText={setNewItem}
+            placeholder="Add custom item..."
+            placeholderTextColor="#9CA3AF"
+          />
+          <CategoryDropdown
+            value={newItemCategory}
+            onSelect={setNewItemCategory}
+          />
+        </View>
+        <TouchableOpacity
+          style={[styles.addButton, !newItem.trim() && styles.addButtonDisabled]}
+          onPress={handleAddItem}
+          disabled={!newItem.trim()}
+        >
+          <Text style={styles.addButtonText}>Add Item</Text>
+        </TouchableOpacity>
+      </View>
 
       {sortedCategories.map(category => (
         <View key={category} style={styles.categorySection}>
@@ -142,10 +241,10 @@ const GroceryScreen = () => {
         </View>
       )}
 
-      {groceryList.manualItems && groceryList.manualItems.length > 0 && (
+      {uncategorizedManualItems.length > 0 && (
         <View style={styles.categorySection}>
-          <Text style={styles.categoryTitle}>Added Items</Text>
-          {groceryList.manualItems.map(item => (
+          <Text style={styles.categoryTitle}>Other</Text>
+          {uncategorizedManualItems.map(item => (
             <TouchableOpacity
               key={item.id}
               style={styles.itemRow}
@@ -175,6 +274,114 @@ const styles = StyleSheet.create({
   content: {
     padding: 16,
     paddingBottom: 32,
+  },
+  addItemContainer: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+  addItemRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginBottom: 12,
+  },
+  addItemInput: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: '#D1D5DB',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 15,
+    color: '#1F2937',
+    backgroundColor: '#F9FAFB',
+  },
+  categoryDropdown: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderWidth: 1,
+    borderColor: '#D1D5DB',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    backgroundColor: '#F9FAFB',
+    minWidth: 110,
+  },
+  categoryDropdownText: {
+    fontSize: 15,
+    color: '#1F2937',
+  },
+  dropdownArrow: {
+    fontSize: 10,
+    color: '#6B7280',
+    marginLeft: 6,
+  },
+  dropdownOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  dropdownModal: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    width: '80%',
+    maxHeight: 400,
+    padding: 16,
+  },
+  dropdownTitle: {
+    fontSize: 17,
+    fontWeight: '600',
+    color: '#1F2937',
+    marginBottom: 12,
+    textAlign: 'center',
+  },
+  dropdownOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 14,
+    paddingHorizontal: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3F4F6',
+  },
+  dropdownOptionSelected: {
+    backgroundColor: '#F0FDF4',
+  },
+  dropdownOptionText: {
+    fontSize: 16,
+    color: '#1F2937',
+  },
+  dropdownOptionTextSelected: {
+    color: '#16A34A',
+    fontWeight: '600',
+  },
+  dropdownCheckmark: {
+    color: '#16A34A',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  addButton: {
+    backgroundColor: '#16A34A',
+    borderRadius: 8,
+    paddingVertical: 12,
+    alignItems: 'center',
+  },
+  addButtonDisabled: {
+    backgroundColor: '#D1D5DB',
+  },
+  addButtonText: {
+    color: '#fff',
+    fontSize: 15,
+    fontWeight: '600',
   },
   header: {
     flexDirection: 'row',

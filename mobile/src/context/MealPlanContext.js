@@ -665,6 +665,24 @@ export const MealPlanProvider = ({ children }) => {
     }
   }
 
+  const addManualGroceryItem = async (itemName, category = null) => {
+    const newItem = {
+      id: `manual-${Date.now()}`,
+      item: itemName,
+      category: category || 'other',
+      checked: false,
+    }
+    const updatedManualItems = [...(groceryList?.manualItems || []), newItem]
+    const updatedGroceryList = { ...groceryList, manualItems: updatedManualItems }
+    setGroceryList(updatedGroceryList)
+
+    if (mealPlan?.id) {
+      await mealPlanService.updateGroceryList(mealPlan.id, {
+        manual_items: updatedManualItems,
+      })
+    }
+  }
+
   const refreshGroceryList = async (includeBeverages = false) => {
     if (!mealPlan?.dinners || mealPlan.dinners.length === 0) return
 
@@ -693,6 +711,7 @@ export const MealPlanProvider = ({ children }) => {
     removeMeal,
     clearMealPlan,
     updateGroceryItem,
+    addManualGroceryItem,
     refreshMealPlan: fetchMealPlan,
     refreshGroceryList,
     addSideDish,

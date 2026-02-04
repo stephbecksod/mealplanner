@@ -2,9 +2,20 @@ import { useState, useEffect } from 'react'
 import { useMealPlan } from '../context/MealPlanContext'
 import { groupByCategory } from '../utils/groceryUtils'
 
+const GROCERY_CATEGORIES = [
+  { value: 'produce', label: 'Produce' },
+  { value: 'protein', label: 'Protein' },
+  { value: 'dairy', label: 'Dairy' },
+  { value: 'pantry', label: 'Pantry' },
+  { value: 'spices', label: 'Spices' },
+  { value: 'beverages', label: 'Beverages' },
+  { value: 'other', label: 'Other' },
+]
+
 const GroceryList = () => {
   const { groceryList, updateGroceryItem, addManualGroceryItem, refreshGroceryList, mealPlan } = useMealPlan()
   const [newItem, setNewItem] = useState('')
+  const [newItemCategory, setNewItemCategory] = useState('other')
   const [includeBeverages, setIncludeBeverages] = useState(false)
   const [checkedWines, setCheckedWines] = useState({})
 
@@ -37,13 +48,24 @@ const GroceryList = () => {
     )
   }
 
-  const groupedItems = groupByCategory(groceryList.items)
+  // Combine regular items with manual items that have categories
+  const allItems = [
+    ...groceryList.items,
+    ...(groceryList.manualItems || []).filter(item => item.category && item.category !== 'other'),
+  ]
+  const groupedItems = groupByCategory(allItems)
+
+  // Get manual items without category or with 'other' category for the Custom Items section
+  const uncategorizedManualItems = (groceryList.manualItems || []).filter(
+    item => !item.category || item.category === 'other'
+  )
 
   const handleAddItem = (e) => {
     e.preventDefault()
     if (newItem.trim()) {
-      addManualGroceryItem(newItem.trim())
+      addManualGroceryItem(newItem.trim(), newItemCategory)
       setNewItem('')
+      setNewItemCategory('other')
     }
   }
 
@@ -80,6 +102,15 @@ const GroceryList = () => {
             placeholder="Add custom item..."
             className="flex-1 input-field"
           />
+          <select
+            value={newItemCategory}
+            onChange={(e) => setNewItemCategory(e.target.value)}
+            className="input-field w-32"
+          >
+            {GROCERY_CATEGORIES.map(cat => (
+              <option key={cat.value} value={cat.value}>{cat.label}</option>
+            ))}
+          </select>
           <button type="submit" className="btn-primary">
             Add
           </button>
@@ -132,13 +163,13 @@ const GroceryList = () => {
         </div>
       )}
 
-      {groceryList.manualItems && groceryList.manualItems.length > 0 && (
+      {uncategorizedManualItems.length > 0 && (
         <div className="mb-6">
-          <h3 className="text-lg font-semibold text-gray-700 mb-3">
-            Custom Items
+          <h3 className="text-lg font-semibold text-gray-700 mb-3 capitalize">
+            Other
           </h3>
           <ul className="space-y-2">
-            {groceryList.manualItems.map((item) => (
+            {uncategorizedManualItems.map((item) => (
               <li key={item.id} className="flex items-center">
                 <input
                   type="checkbox"

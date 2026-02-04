@@ -859,10 +859,11 @@ export const MealPlanProvider = ({ children }) => {
     }
   }
 
-  const addManualGroceryItem = async (itemName) => {
+  const addManualGroceryItem = async (itemName, category = null) => {
     const newItem = {
       id: `manual-${Date.now()}`,
       item: itemName,
+      category: category || 'other',
       checked: false,
     }
     const updatedManualItems = [...(groceryList.manualItems || []), newItem]
