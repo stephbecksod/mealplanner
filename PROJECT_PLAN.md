@@ -183,7 +183,7 @@ meal-planner/
 ### Phase 7: Production Deployment ✅ COMPLETE
 **Goal**: Make the app publicly accessible
 - ✅ Database migration deployed to Supabase
-- ✅ Edge Functions deployed to Supabase (generate-meals, regenerate-meal, add-side-dish, add-beverage, generate-grocery)
+- ✅ Edge Functions deployed to Supabase (generate-meals, regenerate-meal, add-side-dish, add-beverage, generate-grocery, convert-method)
 - ✅ ANTHROPIC_API_KEY secret configured in Supabase
 - ✅ Frontend deployed to Vercel
 - ✅ Production URL configured in Supabase Auth settings
@@ -296,6 +296,50 @@ To get a scannable QR code, use:
 https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=exp://YOUR-TUNNEL-URL-HERE
 ```
 
+### Phase 10: Cooking Equipment & Alternative Methods ✅ COMPLETE
+**Goal**: Let users specify kitchen equipment and see how recipes can be adapted
+
+**Completed:**
+- ✅ Settings page with kitchen equipment selection (oven, stovetop, grill, air fryer, instant pot, slow cooker, sous vide, smoker, dutch oven, wok)
+- ✅ `cooking_equipment` column added to `user_preferences` table (migration 002)
+- ✅ `userPreferencesService` with getCookingEquipment/updateCookingEquipment in supabaseData.js
+- ✅ Equipment preferences passed to generate-meals and regenerate-meal Edge Functions
+- ✅ AI prompt constrains recipes to user's available equipment
+- ✅ Equipment tags (blue badges) displayed on MealCard and RecipeDetail
+- ✅ Alternative methods with inline adjustment notes (expand/collapse accordion in RecipeDetail)
+  - Each alternative method has `equipment`, `label`, and `notes` (1-2 sentences on what to change)
+  - No API call needed — notes are generated with the initial recipe and shown instantly
+- ✅ Settings link in Navigation bar
+- ✅ convert-method Edge Function deployed (for full recipe conversion if needed later)
+- ✅ Mobile support: ProfileScreen with equipment selection, RecipeDetailModal with equipment tags and alternative methods
+- ✅ All Edge Functions redeployed with equipment logic (generate-meals v6, regenerate-meal v6, convert-method v1)
+
+**Files added/modified:**
+- `client/src/pages/Settings.jsx` (new) - Equipment selection UI
+- `client/src/App.jsx` - Settings route
+- `client/src/components/Navigation.jsx` - Settings link
+- `client/src/components/MealCard.jsx` - Equipment tags on cards
+- `client/src/components/RecipeDetail.jsx` - Equipment tags + alternative methods accordion
+- `client/src/context/MealPlanContext.jsx` - Passes cookingEquipment to API, convertCookingMethod function
+- `client/src/services/api.js` - convertCookingMethod endpoint, cookingEquipment params
+- `client/src/services/supabaseData.js` - userPreferencesService with equipment CRUD
+- `mobile/src/screens/ProfileScreen.js` - Equipment selection
+- `mobile/src/components/RecipeDetailModal.js` - Equipment tags + alternative methods
+- `mobile/src/context/MealPlanContext.js` - Equipment support
+- `mobile/src/services/api.js` - Equipment params
+- `mobile/src/services/supabaseData.js` - Equipment service
+- `server/routes/meals.js` - convert-method route
+- `server/services/claudeService.js` - Equipment-aware prompts
+- `supabase/functions/generate-meals/index.ts` - Equipment constraints + alternativeMethods with notes
+- `supabase/functions/regenerate-meal/index.ts` - Same
+- `supabase/functions/convert-method/index.ts` (new) - Full recipe conversion Edge Function
+- `supabase/migrations/002_cooking_equipment.sql` (new) - ALTER TABLE for cooking_equipment column
+
+**Important deployment notes:**
+- Edge Functions must be deployed via `npx supabase functions deploy <function-name>` after code changes
+- Migration 002 must be run in Supabase SQL Editor if not already applied
+- The `convert-method` Edge Function is deployed but currently unused by the UI (alternative method notes replaced full conversion)
+
 ## Key Technical Decisions
 - **Multi-user with Supabase** - PostgreSQL database with Row Level Security
 - **Supabase Auth** for user authentication (email/password)
@@ -346,7 +390,15 @@ https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=exp://YOUR-TUNNEL-
   cookTime: number (minutes),
   servings: number (default),
   cuisine: string,
-  dietaryInfo: [string]
+  dietaryInfo: [string],
+  equipment: [string],              // e.g. ["oven", "stovetop"] - only present if user has equipment prefs
+  alternativeMethods: [             // only present if user has equipment prefs
+    {
+      equipment: string,            // e.g. "air_fryer"
+      label: string,                // e.g. "Air Fryer"
+      notes: string                 // e.g. "Preheat air fryer to 400°F and cook for 20 min instead of 40 min in oven."
+    }
+  ]
 }
 ```
 
@@ -468,7 +520,7 @@ saved_recipes (id, user_id, recipe_data, created_at)
 saved_cocktails (id, user_id, cocktail_data, created_at)
 saved_side_dishes (id, user_id, side_dish_data, created_at)
 grocery_lists (id, meal_plan_id, items, manual_items, checked_items, include_beverages)
-user_preferences (id, user_id, default_servings, default_dietary_preferences, default_cuisine_preferences)
+user_preferences (id, user_id, default_servings, default_dietary_preferences, default_cuisine_preferences, cooking_equipment)
 ```
 
 ### Legacy localStorage Keys (for migration only)
@@ -484,6 +536,34 @@ user_preferences (id, user_id, default_servings, default_dietary_preferences, de
 ```
 
 ## Recent Changes (Latest Session)
+
+### Cooking Equipment & Alternative Methods (Web + Mobile)
+1. **Settings Page** (`client/src/pages/Settings.jsx`):
+   - New page for selecting available kitchen equipment
+   - Toggleable equipment options with optimistic updates to Supabase
+   - Accessible from Navigation bar
+
+2. **Equipment-Aware Meal Generation**:
+   - `generate-meals` and `regenerate-meal` Edge Functions updated to accept `cookingEquipment`
+   - AI only generates recipes using the user's available equipment
+   - Each recipe includes `equipment` array and `alternativeMethods` with adjustment notes
+   - Edge Functions redeployed to Supabase after changes
+
+3. **Recipe UI Updates**:
+   - Blue equipment tags on MealCard (e.g., "Oven", "Stovetop")
+   - RecipeDetail shows equipment tags in Tags section
+   - Alternative Methods shown as expand/collapse accordion — click to reveal 1-2 sentence adjustment notes
+   - No API call needed for alternatives (notes are pre-generated with the recipe)
+
+4. **Database Migration** (`supabase/migrations/002_cooking_equipment.sql`):
+   - Added `cooking_equipment TEXT[]` column to `user_preferences` table
+   - Default: `{"oven", "stovetop"}`
+   - **Must be run in Supabase SQL Editor if not already applied**
+
+5. **Deployment Note**:
+   - All Edge Functions were redeployed during this session
+   - `convert-method` Edge Function was deployed (available for full recipe conversion if needed later, currently unused by UI)
+   - **Important**: After modifying Edge Function code locally, you must run `npx supabase functions deploy <function-name>` to push changes live
 
 ### Grocery List Enhancements (Web + Mobile)
 1. **Manual Item Addition with Category Selection**:
@@ -738,6 +818,8 @@ All Phase 5 tasks have been completed. See MULTI_USER_MIGRATION.md for the multi
 - ✅ Mobile App - Native iOS/Android apps with full feature parity (Phase 9)
 - ✅ Smart Grocery Quantity Aggregation - Combines "1 large + ½ medium" into "1½"
 - ✅ Manual Grocery Items with Categories - Add custom items to specific categories
+- ✅ Cooking Equipment Preferences - Select kitchen equipment, recipes constrained to available tools
+- ✅ Alternative Cooking Methods - Inline notes on how to adapt recipes for different equipment
 
 ### Recipe Customization & AI Chat
 - **Ingredient Swap** - Swap out ingredients in a recipe (e.g., make this with beef instead of chicken) or remove an ingredient entirely
