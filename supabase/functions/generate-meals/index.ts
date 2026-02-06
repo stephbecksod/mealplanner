@@ -13,6 +13,20 @@ interface GenerateMealsRequest {
   servings?: number
   includeSides?: boolean
   prioritizeOverlap?: boolean
+  cookingEquipment?: string[]
+}
+
+const EQUIPMENT_LABELS: Record<string, string> = {
+  oven: 'Oven',
+  stovetop: 'Stovetop',
+  grill: 'Grill',
+  air_fryer: 'Air Fryer',
+  instant_pot: 'Instant Pot',
+  slow_cooker: 'Slow Cooker',
+  sous_vide: 'Sous Vide',
+  smoker: 'Smoker',
+  dutch_oven: 'Dutch Oven',
+  wok: 'Wok',
 }
 
 function buildRecipePrompt({
@@ -23,6 +37,7 @@ function buildRecipePrompt({
   servings,
   includeSides,
   prioritizeOverlap,
+  cookingEquipment,
 }: GenerateMealsRequest): string {
   let prompt = `Generate ${numberOfMeals} dinner recipe${numberOfMeals > 1 ? 's' : ''} with the following requirements:\n\n`
 
@@ -32,6 +47,17 @@ function buildRecipePrompt({
 
   if (cuisinePreferences && cuisinePreferences.length > 0) {
     prompt += `Cuisine Preferences: ${cuisinePreferences.join(', ')}\n`
+  }
+
+  // Add cooking equipment constraints
+  if (cookingEquipment && cookingEquipment.length > 0) {
+    const equipmentLabels = cookingEquipment.map(e => EQUIPMENT_LABELS[e] || e)
+    prompt += `Available Cooking Equipment: ${equipmentLabels.join(', ')}\n`
+    prompt += `IMPORTANT - Equipment Constraints:
+- ONLY generate recipes that can be made using the equipment listed above
+- Include an "equipment" field in each recipe listing which equipment is required
+- If a recipe can be adapted to use different equipment the user has, include "alternativeMethods" array
+- Each alternative method should have "equipment" (the equipment key like "air_fryer"), "label" (display text like "Air Fryer"), and "notes" (1-2 sentences explaining what to do differently, e.g. "Preheat air fryer to 400°F and cook for 20 minutes, flipping halfway, instead of 40 minutes in the oven.")\n\n`
   }
 
   if (proteinPreferences && proteinPreferences.length > 0) {
@@ -58,6 +84,17 @@ function buildRecipePrompt({
 Example strategy: If one meal uses chicken breasts, another could use chicken thighs. If one uses fresh herbs, find ways to use them in other meals too.\n\n`
   }
 
+  // Add equipment fields to JSON format if cooking equipment is specified
+  const equipmentFields = cookingEquipment && cookingEquipment.length > 0 ? `
+      "equipment": ["oven", "stovetop", etc. - list required equipment],
+      "alternativeMethods": [
+        {
+          "equipment": "air_fryer",
+          "label": "Air Fryer",
+          "notes": "1-2 sentences on what to change (temps, times, technique)"
+        }
+      ],` : ''
+
   if (includeSides) {
     prompt += `For each recipe, include a complementary side dish. The side dish should:
 - Balance the meal (if main is heavy, use a light vegetable/salad; if main lacks carbs, suggest pasta/rice/potatoes)
@@ -73,7 +110,7 @@ Example strategy: If one meal uses chicken breasts, another could use chicken th
       "dietaryInfo": ["vegetarian", "gluten-free", etc.],
       "servings": ${servings || 4},
       "prepTime": prep time in minutes,
-      "cookTime": cook time in minutes,
+      "cookTime": cook time in minutes,${equipmentFields}
       "ingredients": [
         {
           "item": "ingredient name",
@@ -119,7 +156,7 @@ Example strategy: If one meal uses chicken breasts, another could use chicken th
       "dietaryInfo": ["vegetarian", "gluten-free", etc.],
       "servings": ${servings || 4},
       "prepTime": prep time in minutes,
-      "cookTime": cook time in minutes,
+      "cookTime": cook time in minutes,${equipmentFields}
       "ingredients": [
         {
           "item": "ingredient name",
@@ -157,6 +194,7 @@ serve(async (req) => {
       servings = 4,
       includeSides = false,
       prioritizeOverlap = true,
+      cookingEquipment = [],
     }: GenerateMealsRequest = await req.json()
 
     // Validate input
@@ -176,6 +214,7 @@ serve(async (req) => {
       servings,
       includeSides,
       prioritizeOverlap,
+      cookingEquipment,
     })
 
     const response = await generateCompletion(prompt)

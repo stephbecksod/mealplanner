@@ -50,6 +50,7 @@ const MealCard = ({ dinner, dayIndex, onRegenerate, onRemove, loading: parentLoa
     removeCocktail,
     addWinePairing,
     removeWinePairing,
+    convertCookingMethod,
   } = useMealPlan()
 
   const [showRecipeModal, setShowRecipeModal] = useState(false)
@@ -211,13 +212,32 @@ const MealCard = ({ dinner, dayIndex, onRegenerate, onRemove, loading: parentLoa
           <TouchableOpacity style={styles.itemInfo} onPress={() => setShowRecipeModal(true)}>
             <Text style={styles.mainDishName}>{mainDish.name}</Text>
             <Text style={styles.itemMeta}>{mainDish.cuisine} | {totalTime} min | {servings} servings</Text>
-            {mainDish.dietaryInfo && mainDish.dietaryInfo.length > 0 && (
+            {(mainDish.dietaryInfo?.length > 0 || mainDish.equipment?.length > 0) && (
               <View style={styles.badgeRow}>
-                {mainDish.dietaryInfo.slice(0, 3).map((info, idx) => (
-                  <View key={idx} style={styles.badge}>
+                {mainDish.dietaryInfo?.slice(0, 3).map((info, idx) => (
+                  <View key={`diet-${idx}`} style={styles.badge}>
                     <Text style={styles.badgeText}>{info}</Text>
                   </View>
                 ))}
+                {mainDish.equipment?.slice(0, 2).map((equip, idx) => {
+                  const equipmentLabels = {
+                    oven: 'Oven',
+                    stovetop: 'Stovetop',
+                    grill: 'Grill',
+                    air_fryer: 'Air Fryer',
+                    instant_pot: 'Instant Pot',
+                    slow_cooker: 'Slow Cooker',
+                    sous_vide: 'Sous Vide',
+                    smoker: 'Smoker',
+                    dutch_oven: 'Dutch Oven',
+                    wok: 'Wok',
+                  }
+                  return (
+                    <View key={`equip-${idx}`} style={styles.equipmentBadge}>
+                      <Text style={styles.equipmentBadgeText}>{equipmentLabels[equip] || equip}</Text>
+                    </View>
+                  )
+                })}
               </View>
             )}
           </TouchableOpacity>
@@ -401,6 +421,10 @@ const MealCard = ({ dinner, dayIndex, onRegenerate, onRemove, loading: parentLoa
         onClose={() => setShowRecipeModal(false)}
         onToggleFavorite={handleToggleMainFavorite}
         isFavorite={isMainSaved}
+        onConvertMethod={mainDish.alternativeMethods?.length > 0
+          ? (targetEquipment) => convertCookingMethod(dinner.id, targetEquipment)
+          : null
+        }
       />
 
       <SideDishDetailModal
@@ -887,6 +911,17 @@ const styles = StyleSheet.create({
   badgeText: {
     fontSize: 11,
     color: '#166534',
+    fontWeight: '500',
+  },
+  equipmentBadge: {
+    backgroundColor: '#DBEAFE',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 10,
+  },
+  equipmentBadgeText: {
+    fontSize: 11,
+    color: '#1E40AF',
     fontWeight: '500',
   },
   itemActions: {

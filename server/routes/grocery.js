@@ -8,14 +8,24 @@ const router = express.Router()
 // Preparation methods to remove (these don't affect what you buy)
 const PREP_METHODS = [
   'cubed', 'diced', 'sliced', 'minced', 'chopped', 'julienned', 'shredded',
-  'grated', 'crushed', 'mashed', 'pureed', 'ground', 'torn', 'cut',
+  'grated', 'crushed', 'mashed', 'pureed', 'torn', 'cut',
   'thinly sliced', 'roughly chopped', 'finely chopped', 'finely diced',
   'finely minced', 'coarsely chopped', 'halved', 'quartered', 'trimmed',
   'peeled', 'seeded', 'deveined', 'cleaned', 'washed', 'dried', 'patted dry',
   'at room temperature', 'room temperature', 'softened', 'melted', 'cooled',
-  'warmed', 'chilled', 'frozen', 'thawed', 'divided', 'separated',
+  'warmed', 'chilled', 'thawed', 'divided', 'separated',
   'beaten', 'whisked', 'sifted', 'toasted', 'roasted', 'grilled', 'sauteed',
   'packed', 'loosely packed', 'firmly packed', 'lightly packed',
+  'uncooked', 'rinsed', 'drained', 'soaked', 'blanched',
+  'marinated', 'seasoned', 'brined', 'pounded', 'flattened', 'scored',
+  'zested', 'juiced', 'freshly squeezed', 'freshly ground', 'freshly grated',
+]
+
+// Extra prep methods only for cleaning quantity strings (not ingredient names)
+// These may be important qualifiers for the ingredient but not for the amount
+const QUANTITY_ONLY_PREP_METHODS = [
+  ...PREP_METHODS,
+  'cooked', 'raw', 'frozen', 'ground',
 ]
 
 // Important qualifiers to KEEP (these affect what you buy)
@@ -154,11 +164,39 @@ const UNIT_ALIASES = {
   'clove': 'clove', 'cloves': 'clove',
 }
 
+// Clean prep methods from a quantity string
+const cleanQuantityString = (qtyStr) => {
+  if (!qtyStr) return ''
+
+  let str = qtyStr.toString().trim()
+
+  // Remove prep methods from the quantity (use extended list for quantities)
+  QUANTITY_ONLY_PREP_METHODS.forEach(prep => {
+    // Remove prep method with comma before it: "1 tbsp, grated" -> "1 tbsp"
+    str = str.replace(new RegExp(`,\\s*${prep}\\b`, 'gi'), '')
+    // Remove prep method with comma after it: "grated, 1 tbsp" -> "1 tbsp"
+    str = str.replace(new RegExp(`\\b${prep}\\s*,\\s*`, 'gi'), '')
+    // Remove standalone prep method
+    str = str.replace(new RegExp(`\\b${prep}\\b`, 'gi'), '')
+  })
+
+  // Clean up extra spaces and punctuation
+  str = str
+    .replace(/\s*,\s*,\s*/g, ', ')
+    .replace(/,\s*$/g, '')
+    .replace(/^\s*,\s*/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+
+  return str
+}
+
 // Parse a quantity string and extract number, unit, and size info
 const parseQuantityWithUnit = (qtyStr) => {
   if (!qtyStr) return { number: 0, unit: '', sizeInfo: '' }
 
-  let str = qtyStr.toString().trim()
+  // First, clean prep methods from the quantity string
+  let str = cleanQuantityString(qtyStr)
   let number = 0
   let unit = ''
   let sizeInfo = ''

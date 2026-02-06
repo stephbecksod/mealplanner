@@ -250,13 +250,32 @@ const MealCard = ({ dinner, dayNumber, onRegenerate, onRemove, showActions = tru
                 <p className="text-sm text-gray-500">
                   {mainDish.cuisine} | {totalTime} min | {dinner.servings} servings
                 </p>
-                {mainDish.dietaryInfo && mainDish.dietaryInfo.length > 0 && (
+                {(mainDish.dietaryInfo?.length > 0 || mainDish.equipment?.length > 0) && (
                   <div className="flex flex-wrap gap-1 mt-2">
-                    {mainDish.dietaryInfo.slice(0, 3).map((info, idx) => (
-                      <span key={idx} className="px-2 py-0.5 bg-green-100 text-green-800 text-xs rounded-full">
+                    {mainDish.dietaryInfo?.slice(0, 3).map((info, idx) => (
+                      <span key={`diet-${idx}`} className="px-2 py-0.5 bg-green-100 text-green-800 text-xs rounded-full">
                         {info}
                       </span>
                     ))}
+                    {mainDish.equipment?.slice(0, 2).map((equip, idx) => {
+                      const equipmentLabels = {
+                        oven: 'Oven',
+                        stovetop: 'Stovetop',
+                        grill: 'Grill',
+                        air_fryer: 'Air Fryer',
+                        instant_pot: 'Instant Pot',
+                        slow_cooker: 'Slow Cooker',
+                        sous_vide: 'Sous Vide',
+                        smoker: 'Smoker',
+                        dutch_oven: 'Dutch Oven',
+                        wok: 'Wok',
+                      }
+                      return (
+                        <span key={`equip-${idx}`} className="px-2 py-0.5 bg-blue-100 text-blue-800 text-xs rounded-full">
+                          {equipmentLabels[equip] || equip}
+                        </span>
+                      )
+                    })}
                   </div>
                 )}
               </div>

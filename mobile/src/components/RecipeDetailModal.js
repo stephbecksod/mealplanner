@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import {
   View,
   Text,
@@ -5,7 +6,21 @@ import {
   TouchableOpacity,
   StyleSheet,
   Modal,
+  ActivityIndicator,
 } from 'react-native'
+
+const EQUIPMENT_LABELS = {
+  oven: 'Oven',
+  stovetop: 'Stovetop',
+  grill: 'Grill',
+  air_fryer: 'Air Fryer',
+  instant_pot: 'Instant Pot',
+  slow_cooker: 'Slow Cooker',
+  sous_vide: 'Sous Vide',
+  smoker: 'Smoker',
+  dutch_oven: 'Dutch Oven',
+  wok: 'Wok',
+}
 
 const StarIcon = ({ filled, size = 20 }) => (
   <View style={{ width: size, height: size }}>
@@ -15,10 +30,23 @@ const StarIcon = ({ filled, size = 20 }) => (
   </View>
 )
 
-const RecipeDetailModal = ({ visible, recipe, onClose, onToggleFavorite, isFavorite }) => {
+const RecipeDetailModal = ({ visible, recipe, onClose, onToggleFavorite, isFavorite, onConvertMethod }) => {
+  const [converting, setConverting] = useState(null)
+
   if (!recipe) return null
 
   const totalTime = (recipe.prepTime || 0) + (recipe.cookTime || 0)
+
+  const handleConvertMethod = async (method) => {
+    if (!onConvertMethod) return
+
+    setConverting(method.equipment)
+    try {
+      await onConvertMethod(method.equipment)
+    } finally {
+      setConverting(null)
+    }
+  }
 
   return (
     <Modal
@@ -69,14 +97,55 @@ const RecipeDetailModal = ({ visible, recipe, onClose, onToggleFavorite, isFavor
             </View>
           </View>
 
-          {recipe.dietaryInfo && recipe.dietaryInfo.length > 0 && (
+          {/* Tags Section (Dietary Info + Equipment) */}
+          {(recipe.dietaryInfo?.length > 0 || recipe.equipment?.length > 0) && (
             <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Dietary Info</Text>
+              <Text style={styles.sectionTitle}>Tags</Text>
               <View style={styles.badgeContainer}>
-                {recipe.dietaryInfo.map((info, idx) => (
-                  <View key={idx} style={styles.badge}>
+                {recipe.dietaryInfo?.map((info, idx) => (
+                  <View key={`diet-${idx}`} style={styles.badge}>
                     <Text style={styles.badgeText}>{info}</Text>
                   </View>
+                ))}
+                {recipe.equipment?.map((equip, idx) => (
+                  <View key={`equip-${idx}`} style={styles.equipmentBadge}>
+                    <Text style={styles.equipmentBadgeText}>
+                      {EQUIPMENT_LABELS[equip] || equip}
+                    </Text>
+                  </View>
+                ))}
+              </View>
+            </View>
+          )}
+
+          {/* Alternative Methods Section */}
+          {recipe.alternativeMethods?.length > 0 && onConvertMethod && (
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Alternative Methods</Text>
+              <Text style={styles.sectionSubtitle}>
+                This recipe can be adapted for other cooking equipment you have.
+              </Text>
+              <View style={styles.methodsContainer}>
+                {recipe.alternativeMethods.map((method, idx) => (
+                  <TouchableOpacity
+                    key={idx}
+                    onPress={() => handleConvertMethod(method)}
+                    disabled={converting !== null}
+                    style={[
+                      styles.methodButton,
+                      converting === method.equipment && styles.methodButtonActive,
+                      converting !== null && converting !== method.equipment && styles.methodButtonDisabled,
+                    ]}
+                  >
+                    {converting === method.equipment ? (
+                      <View style={styles.methodButtonLoading}>
+                        <ActivityIndicator size="small" color="#1D4ED8" />
+                        <Text style={styles.methodButtonText}>Converting...</Text>
+                      </View>
+                    ) : (
+                      <Text style={styles.methodButtonText}>{method.label}</Text>
+                    )}
+                  </TouchableOpacity>
                 ))}
               </View>
             </View>
@@ -200,6 +269,12 @@ const styles = StyleSheet.create({
     color: '#1F2937',
     marginBottom: 12,
   },
+  sectionSubtitle: {
+    fontSize: 14,
+    color: '#6B7280',
+    marginBottom: 12,
+    marginTop: -8,
+  },
   badgeContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -215,6 +290,46 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: '#166534',
     fontWeight: '500',
+  },
+  equipmentBadge: {
+    backgroundColor: '#DBEAFE',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+  },
+  equipmentBadgeText: {
+    fontSize: 13,
+    color: '#1E40AF',
+    fontWeight: '500',
+  },
+  methodsContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  methodButton: {
+    backgroundColor: '#EFF6FF',
+    borderWidth: 1,
+    borderColor: '#BFDBFE',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 10,
+  },
+  methodButtonActive: {
+    backgroundColor: '#DBEAFE',
+  },
+  methodButtonDisabled: {
+    opacity: 0.5,
+  },
+  methodButtonLoading: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  methodButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#1D4ED8',
   },
   ingredientRow: {
     flexDirection: 'row',

@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, useEffect, useCallback } from 'react'
 import { useAuth } from './AuthContext'
-import { mealPlanService } from '../services/supabaseData'
+import { mealPlanService, userPreferencesService } from '../services/supabaseData'
 import { mealsAPI, groceryAPI, beveragesAPI } from '../services/api'
 
 const MealPlanContext = createContext()
@@ -59,6 +59,14 @@ export const MealPlanProvider = ({ children }) => {
     setError(null)
 
     try {
+      // Get cooking equipment from user preferences
+      let cookingEquipment = null
+      try {
+        cookingEquipment = await userPreferencesService.getCookingEquipment()
+      } catch (err) {
+        console.warn('Could not fetch cooking equipment preferences:', err)
+      }
+
       const meals = await mealsAPI.generateMeals({
         numberOfMeals,
         dietaryPreferences,
@@ -67,6 +75,7 @@ export const MealPlanProvider = ({ children }) => {
         servings,
         includeSides,
         prioritizeOverlap,
+        cookingEquipment,
       })
 
       const dinners = meals.map((meal, index) => {
@@ -151,6 +160,14 @@ export const MealPlanProvider = ({ children }) => {
           ingredients: d.mainDish.ingredients?.map(i => i.item) || [],
         }))
 
+      // Get cooking equipment from user preferences
+      let cookingEquipment = null
+      try {
+        cookingEquipment = await userPreferencesService.getCookingEquipment()
+      } catch (err) {
+        console.warn('Could not fetch cooking equipment preferences:', err)
+      }
+
       const newRecipe = await mealsAPI.regenerateMeal({
         mealId,
         dietaryPreferences,
@@ -160,6 +177,7 @@ export const MealPlanProvider = ({ children }) => {
         includeSides: includeSides || hasSides,
         existingMeals,
         prioritizeOverlap: mealPlan.prioritizeOverlap !== false,
+        cookingEquipment,
       })
 
       const { sideDish, ...mainDish } = newRecipe
@@ -907,6 +925,49 @@ export const MealPlanProvider = ({ children }) => {
     }
   }
 
+  const convertCookingMethod = async (mealId, targetEquipment) => {
+    setLoading(true)
+    setError(null)
+
+    try {
+      const dinner = mealPlan.dinners.find(d => d.id === mealId)
+      if (!dinner || !dinner.mainDish) throw new Error('Meal not found')
+
+      const convertedRecipe = await mealsAPI.convertCookingMethod({
+        recipe: dinner.mainDish,
+        targetEquipment,
+      })
+
+      // Preserve the original recipe ID
+      const updatedMainDish = {
+        ...convertedRecipe,
+        id: dinner.mainDish.id,
+      }
+
+      // Update in Supabase
+      await mealPlanService.updateDinner(mealId, { mainDish: updatedMainDish })
+
+      const updatedDinners = mealPlan.dinners.map(d =>
+        d.id === mealId ? { ...d, mainDish: updatedMainDish } : d
+      )
+
+      const updatedMealPlan = { ...mealPlan, dinners: updatedDinners }
+      setMealPlan(updatedMealPlan)
+
+      // Update grocery list since ingredients might have changed
+      const newGroceryList = await groceryAPI.generateList({ meals: updatedDinners })
+      await mealPlanService.upsertGroceryList(mealPlan.id, newGroceryList)
+      setGroceryList(newGroceryList)
+
+      return updatedMainDish
+    } catch (err) {
+      setError(err.message || 'Failed to convert cooking method')
+      throw err
+    } finally {
+      setLoading(false)
+    }
+  }
+
   const value = {
     mealPlan,
     groceryList,
@@ -939,6 +1000,8 @@ export const MealPlanProvider = ({ children }) => {
     regenerateCocktail,
     regenerateWine,
     regenerateAllComponents,
+    // Cooking method conversion
+    convertCookingMethod,
     // Grocery methods
     refreshGroceryList,
     // Refresh method

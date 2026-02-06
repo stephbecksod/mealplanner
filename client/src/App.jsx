@@ -10,6 +10,7 @@ import ProtectedRoute from './components/ProtectedRoute'
 import Home from './pages/Home'
 import MealPlan from './pages/MealPlan'
 import Favorites from './pages/Favorites'
+import Settings from './pages/Settings'
 import Login from './pages/Login'
 import Register from './pages/Register'
 
@@ -49,6 +50,14 @@ function App() {
                       element={
                         <ProtectedRoute>
                           <Favorites />
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route
+                      path="/settings"
+                      element={
+                        <ProtectedRoute>
+                          <Settings />
                         </ProtectedRoute>
                       }
                     />

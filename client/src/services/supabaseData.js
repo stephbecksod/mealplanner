@@ -531,6 +531,155 @@ export const favoritesService = {
 }
 
 // ============================================
+// USER PREFERENCES SERVICE
+// ============================================
+
+// Default equipment (oven and stovetop are pre-checked)
+const DEFAULT_COOKING_EQUIPMENT = ['oven', 'stovetop']
+
+// All available equipment options
+export const COOKING_EQUIPMENT_OPTIONS = [
+  { id: 'oven', label: 'Oven', default: true },
+  { id: 'stovetop', label: 'Stovetop', default: true },
+  { id: 'grill', label: 'Grill (outdoor)', default: false },
+  { id: 'air_fryer', label: 'Air Fryer', default: false },
+  { id: 'instant_pot', label: 'Instant Pot / Pressure Cooker', default: false },
+  { id: 'slow_cooker', label: 'Slow Cooker', default: false },
+  { id: 'sous_vide', label: 'Sous Vide', default: false },
+  { id: 'smoker', label: 'Smoker', default: false },
+  { id: 'dutch_oven', label: 'Dutch Oven', default: false },
+  { id: 'wok', label: 'Wok', default: false },
+]
+
+export const userPreferencesService = {
+  /**
+   * Get user preferences
+   */
+  async getUserPreferences() {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return null
+
+    const { data, error } = await supabase
+      .from('user_preferences')
+      .select('*')
+      .eq('user_id', user.id)
+      .single()
+
+    if (error && error.code !== 'PGRST116') {
+      throw error
+    }
+
+    // Return with defaults if no preferences exist
+    if (!data) {
+      return {
+        default_servings: 4,
+        default_dietary_preferences: [],
+        default_cuisine_preferences: [],
+        cooking_equipment: DEFAULT_COOKING_EQUIPMENT,
+      }
+    }
+
+    return {
+      ...data,
+      cooking_equipment: data.cooking_equipment || DEFAULT_COOKING_EQUIPMENT,
+    }
+  },
+
+  /**
+   * Get just the cooking equipment
+   */
+  async getCookingEquipment() {
+    const prefs = await this.getUserPreferences()
+    return prefs?.cooking_equipment || DEFAULT_COOKING_EQUIPMENT
+  },
+
+  /**
+   * Update cooking equipment
+   */
+  async updateCookingEquipment(equipment) {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) throw new Error('User not authenticated')
+
+    // Try to update existing preferences
+    const { data: existing } = await supabase
+      .from('user_preferences')
+      .select('id')
+      .eq('user_id', user.id)
+      .single()
+
+    if (existing) {
+      const { data, error } = await supabase
+        .from('user_preferences')
+        .update({ cooking_equipment: equipment })
+        .eq('user_id', user.id)
+        .select()
+        .single()
+
+      if (error) throw error
+      return data.cooking_equipment
+    }
+
+    // Create new preferences if none exist
+    const { data, error } = await supabase
+      .from('user_preferences')
+      .insert({
+        user_id: user.id,
+        cooking_equipment: equipment,
+      })
+      .select()
+      .single()
+
+    if (error) throw error
+    return data.cooking_equipment
+  },
+
+  /**
+   * Update all user preferences
+   */
+  async updateUserPreferences(updates) {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) throw new Error('User not authenticated')
+
+    const dbUpdates = {}
+    if (updates.defaultServings !== undefined) dbUpdates.default_servings = updates.defaultServings
+    if (updates.defaultDietaryPreferences !== undefined) dbUpdates.default_dietary_preferences = updates.defaultDietaryPreferences
+    if (updates.defaultCuisinePreferences !== undefined) dbUpdates.default_cuisine_preferences = updates.defaultCuisinePreferences
+    if (updates.cookingEquipment !== undefined) dbUpdates.cooking_equipment = updates.cookingEquipment
+
+    const { data: existing } = await supabase
+      .from('user_preferences')
+      .select('id')
+      .eq('user_id', user.id)
+      .single()
+
+    if (existing) {
+      const { data, error } = await supabase
+        .from('user_preferences')
+        .update(dbUpdates)
+        .eq('user_id', user.id)
+        .select()
+        .single()
+
+      if (error) throw error
+      return data
+    }
+
+    // Create new preferences if none exist
+    const { data, error } = await supabase
+      .from('user_preferences')
+      .insert({
+        user_id: user.id,
+        ...dbUpdates,
+      })
+      .select()
+      .single()
+
+    if (error) throw error
+    return data
+  },
+}
+
+// ============================================
 // MIGRATION SERVICE
 // ============================================
 

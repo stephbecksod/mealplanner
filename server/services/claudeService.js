@@ -26,7 +26,7 @@ class ClaudeService {
     }
   }
 
-  async generateRecipes({ numberOfMeals, dietaryPreferences, cuisinePreferences, proteinPreferences, servings, includeSides = false, prioritizeOverlap = true }) {
+  async generateRecipes({ numberOfMeals, dietaryPreferences, cuisinePreferences, proteinPreferences, servings, includeSides = false, prioritizeOverlap = true, cookingEquipment = null }) {
     const prompt = this.buildRecipePrompt({
       numberOfMeals,
       dietaryPreferences,
@@ -35,13 +35,14 @@ class ClaudeService {
       servings,
       includeSides,
       prioritizeOverlap,
+      cookingEquipment,
     })
 
     const response = await this.generateCompletion(prompt)
     return this.parseRecipesResponse(response, includeSides)
   }
 
-  async regenerateRecipe({ dietaryPreferences, cuisinePreferences, proteinPreferences, servings, includeSides = false, existingMeals = [], prioritizeOverlap = true }) {
+  async regenerateRecipe({ dietaryPreferences, cuisinePreferences, proteinPreferences, servings, includeSides = false, existingMeals = [], prioritizeOverlap = true, cookingEquipment = null }) {
     const prompt = this.buildRegeneratePrompt({
       dietaryPreferences,
       cuisinePreferences,
@@ -50,6 +51,7 @@ class ClaudeService {
       includeSides,
       existingMeals,
       prioritizeOverlap,
+      cookingEquipment,
     })
 
     const response = await this.generateCompletion(prompt)
@@ -73,7 +75,7 @@ class ClaudeService {
     return this.parseBeverageResponse(response)
   }
 
-  buildRecipePrompt({ numberOfMeals, dietaryPreferences, cuisinePreferences, proteinPreferences, servings, includeSides = false, prioritizeOverlap = true }) {
+  buildRecipePrompt({ numberOfMeals, dietaryPreferences, cuisinePreferences, proteinPreferences, servings, includeSides = false, prioritizeOverlap = true, cookingEquipment = null }) {
     let prompt = `Generate ${numberOfMeals} dinner recipe${numberOfMeals > 1 ? 's' : ''} with the following requirements:\n\n`
 
     if (dietaryPreferences && dietaryPreferences.length > 0) {
@@ -95,6 +97,29 @@ class ClaudeService {
     }
 
     prompt += `Servings: ${servings || 4} people\n\n`
+
+    // Add cooking equipment constraints
+    if (cookingEquipment && cookingEquipment.length > 0) {
+      const equipmentLabels = {
+        oven: 'Oven',
+        stovetop: 'Stovetop',
+        grill: 'Grill',
+        air_fryer: 'Air Fryer',
+        instant_pot: 'Instant Pot/Pressure Cooker',
+        slow_cooker: 'Slow Cooker',
+        sous_vide: 'Sous Vide',
+        smoker: 'Smoker',
+        dutch_oven: 'Dutch Oven',
+        wok: 'Wok',
+      }
+      const availableEquipment = cookingEquipment.map(e => equipmentLabels[e] || e).join(', ')
+      prompt += `COOKING EQUIPMENT CONSTRAINTS:
+- Available equipment: ${availableEquipment}
+- ONLY generate recipes that can be made with this equipment
+- Do NOT suggest recipes requiring equipment not listed above
+- Include the primary equipment needed in each recipe's "equipment" field
+- For each recipe, also suggest "alternativeMethods" if the recipe could be adapted to other equipment the user has\n\n`
+    }
 
     if (prioritizeOverlap && numberOfMeals > 1) {
       prompt += `IMPORTANT - Ingredient Overlap Strategy:
@@ -121,6 +146,13 @@ Example strategy: If one meal uses chicken breasts, another could use chicken th
       "name": "Recipe Name",
       "cuisine": "cuisine type",
       "dietaryInfo": ["vegetarian", "gluten-free", etc.],
+      "equipment": ["oven", "stovetop", etc.],
+      "alternativeMethods": [
+        {
+          "equipment": "air_fryer",
+          "label": "Make in Air Fryer"
+        }
+      ],
       "servings": ${servings || 4},
       "prepTime": prep time in minutes,
       "cookTime": cook time in minutes,
@@ -139,6 +171,7 @@ Example strategy: If one meal uses chicken breasts, another could use chicken th
       "sideDish": {
         "name": "Side Dish Name",
         "type": "vegetable|starch|salad",
+        "equipment": ["stovetop"],
         "prepTime": prep time in minutes,
         "cookTime": cook time in minutes,
         "ingredients": [
@@ -158,7 +191,12 @@ Example strategy: If one meal uses chicken breasts, another could use chicken th
       }
     }
   ]
-}`
+}
+
+Note on equipment and alternativeMethods:
+- "equipment" should list the primary equipment needed (e.g., ["oven"] or ["stovetop", "oven"])
+- "alternativeMethods" should ONLY include methods for equipment the user has available
+- Each alternativeMethod needs "equipment" (the equipment ID) and "label" (display text like "Make in Air Fryer")`
     } else {
       prompt += `For each recipe, provide the information in this exact JSON format:
 {
@@ -167,6 +205,13 @@ Example strategy: If one meal uses chicken breasts, another could use chicken th
       "name": "Recipe Name",
       "cuisine": "cuisine type",
       "dietaryInfo": ["vegetarian", "gluten-free", etc.],
+      "equipment": ["oven", "stovetop", etc.],
+      "alternativeMethods": [
+        {
+          "equipment": "air_fryer",
+          "label": "Make in Air Fryer"
+        }
+      ],
       "servings": ${servings || 4},
       "prepTime": prep time in minutes,
       "cookTime": cook time in minutes,
@@ -184,7 +229,12 @@ Example strategy: If one meal uses chicken breasts, another could use chicken th
       ]
     }
   ]
-}`
+}
+
+Note on equipment and alternativeMethods:
+- "equipment" should list the primary equipment needed (e.g., ["oven"] or ["stovetop", "oven"])
+- "alternativeMethods" should ONLY include methods for equipment the user has available
+- Each alternativeMethod needs "equipment" (the equipment ID) and "label" (display text like "Make in Air Fryer")`
     }
 
     prompt += `\n\nGenerate creative, delicious recipes that are practical to make at home. Ensure ingredients have proper quantities and units.`
@@ -192,7 +242,7 @@ Example strategy: If one meal uses chicken breasts, another could use chicken th
     return prompt
   }
 
-  buildRegeneratePrompt({ dietaryPreferences, cuisinePreferences, proteinPreferences, servings, includeSides, existingMeals, prioritizeOverlap = true }) {
+  buildRegeneratePrompt({ dietaryPreferences, cuisinePreferences, proteinPreferences, servings, includeSides, existingMeals, prioritizeOverlap = true, cookingEquipment = null }) {
     let prompt = `Generate 1 new dinner recipe with the following requirements:\n\n`
 
     if (dietaryPreferences && dietaryPreferences.length > 0) {
@@ -209,6 +259,29 @@ Example strategy: If one meal uses chicken breasts, another could use chicken th
     }
 
     prompt += `Servings: ${servings || 4} people\n\n`
+
+    // Add cooking equipment constraints
+    if (cookingEquipment && cookingEquipment.length > 0) {
+      const equipmentLabels = {
+        oven: 'Oven',
+        stovetop: 'Stovetop',
+        grill: 'Grill',
+        air_fryer: 'Air Fryer',
+        instant_pot: 'Instant Pot/Pressure Cooker',
+        slow_cooker: 'Slow Cooker',
+        sous_vide: 'Sous Vide',
+        smoker: 'Smoker',
+        dutch_oven: 'Dutch Oven',
+        wok: 'Wok',
+      }
+      const availableEquipment = cookingEquipment.map(e => equipmentLabels[e] || e).join(', ')
+      prompt += `COOKING EQUIPMENT CONSTRAINTS:
+- Available equipment: ${availableEquipment}
+- ONLY generate recipes that can be made with this equipment
+- Do NOT suggest recipes requiring equipment not listed above
+- Include the primary equipment needed in the recipe's "equipment" field
+- Suggest "alternativeMethods" if the recipe could be adapted to other equipment the user has\n\n`
+    }
 
     // Add existing meals context for ingredient overlap
     if (prioritizeOverlap && existingMeals && existingMeals.length > 0) {
@@ -244,6 +317,13 @@ Please design a NEW recipe that:
       "name": "Recipe Name",
       "cuisine": "cuisine type",
       "dietaryInfo": ["vegetarian", "gluten-free", etc.],
+      "equipment": ["oven", "stovetop", etc.],
+      "alternativeMethods": [
+        {
+          "equipment": "air_fryer",
+          "label": "Make in Air Fryer"
+        }
+      ],
       "servings": ${servings || 4},
       "prepTime": prep time in minutes,
       "cookTime": cook time in minutes,
@@ -262,6 +342,7 @@ Please design a NEW recipe that:
       "sideDish": {
         "name": "Side Dish Name",
         "type": "vegetable|starch|salad",
+        "equipment": ["stovetop"],
         "prepTime": prep time in minutes,
         "cookTime": cook time in minutes,
         "ingredients": [
@@ -290,6 +371,13 @@ Please design a NEW recipe that:
       "name": "Recipe Name",
       "cuisine": "cuisine type",
       "dietaryInfo": ["vegetarian", "gluten-free", etc.],
+      "equipment": ["oven", "stovetop", etc.],
+      "alternativeMethods": [
+        {
+          "equipment": "air_fryer",
+          "label": "Make in Air Fryer"
+        }
+      ],
       "servings": ${servings || 4},
       "prepTime": prep time in minutes,
       "cookTime": cook time in minutes,
@@ -476,6 +564,97 @@ Make the cocktail creative and complementary to the flavors in the dish. The win
       console.error('Failed to parse beverage pairing:', error)
       console.error('Response was:', response)
       throw new Error('Failed to parse beverage pairing data from AI response')
+    }
+  }
+
+  async convertCookingMethod({ recipe, targetEquipment }) {
+    const prompt = this.buildConvertMethodPrompt({ recipe, targetEquipment })
+    const response = await this.generateCompletion(prompt)
+    return this.parseConvertedRecipeResponse(response)
+  }
+
+  buildConvertMethodPrompt({ recipe, targetEquipment }) {
+    const equipmentLabels = {
+      oven: 'Oven',
+      stovetop: 'Stovetop',
+      grill: 'Grill',
+      air_fryer: 'Air Fryer',
+      instant_pot: 'Instant Pot/Pressure Cooker',
+      slow_cooker: 'Slow Cooker',
+      sous_vide: 'Sous Vide',
+      smoker: 'Smoker',
+      dutch_oven: 'Dutch Oven',
+      wok: 'Wok',
+    }
+
+    const targetLabel = equipmentLabels[targetEquipment] || targetEquipment
+
+    return `Convert this recipe to use ${targetLabel} instead of its current cooking method.
+
+ORIGINAL RECIPE:
+Name: ${recipe.name}
+Current Equipment: ${(recipe.equipment || []).join(', ')}
+Prep Time: ${recipe.prepTime} minutes
+Cook Time: ${recipe.cookTime} minutes
+
+Ingredients:
+${recipe.ingredients.map(i => `- ${i.quantity} ${i.item}`).join('\n')}
+
+Instructions:
+${recipe.instructions.map((step, i) => `${i + 1}. ${step}`).join('\n')}
+
+Convert this recipe to use ${targetLabel}. Adjust cooking times and temperatures as needed. Keep the same ingredients unless a substitution is absolutely necessary for the new cooking method.
+
+Provide the converted recipe in this exact JSON format:
+{
+  "recipe": {
+    "name": "${recipe.name}",
+    "cuisine": "${recipe.cuisine}",
+    "dietaryInfo": ${JSON.stringify(recipe.dietaryInfo || [])},
+    "equipment": ["${targetEquipment}"],
+    "servings": ${recipe.servings},
+    "prepTime": adjusted prep time in minutes,
+    "cookTime": adjusted cook time in minutes,
+    "ingredients": [
+      {
+        "item": "ingredient name",
+        "quantity": "amount with unit",
+        "category": "produce|protein|dairy|pantry|spices|other"
+      }
+    ],
+    "instructions": [
+      "step 1 with ${targetLabel}-specific instructions",
+      "step 2",
+      etc.
+    ]
+  }
+}
+
+Make sure the instructions are specific to using ${targetLabel} with appropriate temperatures and timing.`
+  }
+
+  parseConvertedRecipeResponse(response) {
+    try {
+      const jsonMatch = response.match(/\{[\s\S]*\}/)
+      if (!jsonMatch) {
+        throw new Error('No JSON found in response')
+      }
+
+      const parsed = JSON.parse(jsonMatch[0])
+
+      if (!parsed.recipe) {
+        throw new Error('Invalid converted recipe format')
+      }
+
+      return {
+        ...parsed.recipe,
+        id: `recipe-${Date.now()}-${Math.random()}`,
+        alternativeMethods: [], // Clear alternatives after conversion
+      }
+    } catch (error) {
+      console.error('Failed to parse converted recipe:', error)
+      console.error('Response was:', response)
+      throw new Error('Failed to parse converted recipe data from AI response')
     }
   }
 }

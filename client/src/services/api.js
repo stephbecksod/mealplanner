@@ -121,7 +121,7 @@ const fetchWithAuth = async (endpoint, options = {}) => {
 }
 
 export const mealsAPI = {
-  generateMeals: async ({ numberOfMeals, dietaryPreferences, cuisinePreferences, proteinPreferences, servings, includeSides, prioritizeOverlap }) => {
+  generateMeals: async ({ numberOfMeals, dietaryPreferences, cuisinePreferences, proteinPreferences, servings, includeSides, prioritizeOverlap, cookingEquipment }) => {
     const response = await fetchWithAuth('/generate-meals', {
       method: 'POST',
       body: JSON.stringify({
@@ -132,13 +132,14 @@ export const mealsAPI = {
         servings,
         includeSides,
         prioritizeOverlap,
+        cookingEquipment,
       }),
     })
     // Edge Function returns { recipes: [...] }, extract the array
     return response.recipes
   },
 
-  regenerateMeal: async ({ mealId, dietaryPreferences, cuisinePreferences, proteinPreferences, servings, includeSides, existingMeals, prioritizeOverlap }) => {
+  regenerateMeal: async ({ mealId, dietaryPreferences, cuisinePreferences, proteinPreferences, servings, includeSides, existingMeals, prioritizeOverlap, cookingEquipment }) => {
     const response = await fetchWithAuth('/regenerate-meal', {
       method: 'POST',
       body: JSON.stringify({
@@ -150,6 +151,19 @@ export const mealsAPI = {
         includeSides,
         existingMeals,
         prioritizeOverlap,
+        cookingEquipment,
+      }),
+    })
+    // Edge Function returns { recipe: {...} }, extract the recipe
+    return response.recipe
+  },
+
+  convertCookingMethod: async ({ recipe, targetEquipment }) => {
+    const response = await fetchWithAuth('/convert-method', {
+      method: 'POST',
+      body: JSON.stringify({
+        recipe,
+        targetEquipment,
       }),
     })
     // Edge Function returns { recipe: {...} }, extract the recipe
